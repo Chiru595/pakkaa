@@ -44,7 +44,7 @@ Prerequisites: Git, Python 3.12, Node.js 20 or newer.
 
 2. API dependencies:
    ```powershell
-   cd servicespi
+   cd services\api
    py -3.12 -m venv .venv
    .venv\Scripts\python -m pip install -r requirements.txt -r requirements-dev.txt
    cd ..\..
@@ -61,7 +61,7 @@ Prerequisites: Git, Python 3.12, Node.js 20 or newer.
 
 4. Migrations and API (keep this terminal open):
    ```powershell
-   cd servicespi
+   cd services\api
    .venv\Scripts\alembic upgrade head
    .venv\Scripts\python -m uvicorn app.main:app --port 8000 --reload --reload-dir app
    ```
@@ -81,10 +81,10 @@ After a restart, run `scripts/dev_db.py` again (if you use the embedded database
 ## Tests
 
 ```powershell
-cd services/api
+cd servicespi
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python -m ruff check app tests
-cd ..\..pps\web
+cd ..\..\apps\web
 npx tsc -b
 ```
 

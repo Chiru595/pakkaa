@@ -25,12 +25,13 @@ milestone must meet these rules:
 ## Step 0: Nexconn first
 
 - [x] Nexconn docs read (docs.nexconn.ai): packages, init, server API signing, token endpoint, webhooks
-- [ ] App Key and App Secret in `.env` (**blocked on author**)
-- [ ] `NEXCONN_NOTES.md`: confirm or record a fallback for each of: server-side user token, rooms or groups,
+- [x] App Key and App Secret in `.env`; token issue verified against the live API
+- [x] `NEXCONN_NOTES.md`: confirm or record a fallback for each of: server-side user token, rooms or groups,
       custom message types, server API to post as a bot, webhooks for new messages (and their signature
       scheme), private one-to-one channels, guest users, Call SDK for web, token lifetime, rate limits
-- [ ] Hello world: two browsers chat in one room; tokens issued by our API; App Secret never reaches the browser
-- [ ] Fallback if no custom message types: JSON payload with a `type` field, rendered by our components
+- [x] Hello world: two browsers chat in one room; tokens issued by our API; App Secret never reaches the browser
+      (verified with two headless Chrome sessions)
+- [x] Custom message type `PK:Card` works from the server API, so no fallback is needed
 
 ## M0 Skeleton (45 min)
 

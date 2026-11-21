@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+NEXCONN_HOSTS: dict[str, tuple[str, str]] = {
+    "SG": ("https://api.sg-light-api.com", "https://api-b.sg-light-api.com"),
+    "NA": ("https://api.us-light-api.com", "https://api-b.us-light-api.com"),
+    "SA": ("https://api.sau-light-api.com", "https://api-b.sau-light-api.com"),
+}
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env", extra="ignore")
+
+    app_env: str = "development"
+    web_base_url: str = "http://localhost:5173"
+    api_base_url: str = "http://localhost:8000"
+    cors_origins: str = "http://localhost:5173"
+    demo_mode: bool = False
+
+    jwt_secret: str = ""
+    guest_link_secret: str = ""
+    otp_pepper: str = ""
+    field_encryption_keys: str = ""
+
+    database_url: str = "postgresql+psycopg://pakkaa:pakkaa@localhost:5432/pakkaa"
+    database_url_unpooled: str = ""
+
+    nexconn_app_key: str = ""
+    nexconn_app_secret: str = ""
+    nexconn_area: str = "SG"
+    nexconn_bot_user_id: str = "pakkaabot"
+    nexconn_bot_name: str = "Pakkaa"
+
+    openai_api_key: str = ""
+    llm_model_fast: str = "gpt-6-luna"
+    llm_model_live: str = "gpt-6.1-terra"
+    llm_model_smart: str = "gpt-6.2-sol"
+    llm_model_deep: str = "gpt-6.2-astra"
+    llm_embedding_model: str = "text-embedding-3-small"
+    llm_transcribe_model: str = "gpt-transcribe"
+
+    webhook_max_skew_seconds: int = Field(default=300)
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env == "production"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def nexconn_hosts(self) -> tuple[str, str]:
+        try:
+            return NEXCONN_HOSTS[self.nexconn_area.upper()]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported NEXCONN_AREA {self.nexconn_area!r}") from exc
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

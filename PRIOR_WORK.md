@@ -11,7 +11,7 @@ what was built for Pakkaa, so judges can tell the two apart. It is updated after
 | Repository | https://github.com/Chiru595/paidsafe |
 | Pinned commit | `1ca1a53c4a57f5deb526daaf1fb3408348f656d6` (7 Nov 2026, 23:13 IST) |
 | Built for | *Flip the Switch* hackathon, 7 Nov 2026 (Switch / Mattermost, not Nexconn) |
-| Vendored copy | [`legacy/paidsafe/`](legacy/paidsafe/), unchanged except that its `.git` folder was removed. Its 59 tests pass. |
+| Browse it | [PaidSafe at the pinned commit](https://github.com/Chiru595/paidsafe/tree/1ca1a53c4a57f5deb526daaf1fb3408348f656d6). Its 59 tests pass at that commit. PaidSafe is not copied into this repository; only the files listed below are ported. |
 
 PaidSafe was a single-room team chat on Switch (Mattermost) where two LLM debaters argued "chase or wait" on a
 late invoice, a code-only **Ledger** posted cited fact cards and fact-checked every post, and a code-only
@@ -20,8 +20,8 @@ payments, no web app, no database, no negotiation and no money-out flow.
 
 ## What is reused, and how
 
-"Ported" means the logic is copied into `services/api/app/` and adapted (storage, identity and money types);
-the original file is named so it can be diffed.
+"Ported" means the logic is copied into `services/api/app/` and adapted (storage, identity and money types).
+Each ported file starts with a docstring naming its PaidSafe source file, so the two can be diffed.
 
 | PaidSafe module | What it does | Pakkaa destination | How it is reused |
 |---|---|---|---|
@@ -34,7 +34,7 @@ the original file is named so it can be diffed.
 | `tools/common.py` `audit()` | Append-only JSON-lines audit log | `app/security/audit.py` | **Replaced.** Pakkaa's audit log is hash-chained (`prev_hash`) in Postgres with a verify and export endpoint |
 | `tools/memory.py` | Per-client playbook: decision, then the real outcome, fed back as fact card F7 | `app/memory/` | **Concept reused.** Becomes `MemoryItem(kind=playbook/counterparty)` in Postgres with pgvector, scoped per org |
 | `agents/instructions/guardrails.md`, `relationship.md`, `cash.md` | Scope, evidence, authority and honesty rules for LLM agents; debater personas | `app/agents/prompts/` | **Adapted** for the copilot, scribe and (Sunday) the chase-or-wait debaters |
-| `tests/test_interest.py`, `test_factcheck.py`, `test_evidence.py`, parts of `test_warden.py` | Known-answer and safety tests | `services/api/tests/legacy/` | **Ported** with the modules above |
+| `tests/test_interest.py`, `test_factcheck.py`, `test_evidence.py`, parts of `test_warden.py` | Known-answer and safety tests | `services/api/tests/ported/` | **Ported** with the modules above |
 
 ## Not reused
 

@@ -1,6 +1,6 @@
 # Pakkaa: build plan
 
-**Deal pakkaa. Payment pakkaa.** The money layer for business conversations.
+**Deal pakkaa! Payment pakkaa!** The money layer for business conversations.
 
 Status key: `[ ]` to do · `[~]` in progress · `[x]` done and deployed · `(P)` production-hardening item.
 After each milestone: tests green, commit, deploy, update this file and `PRIOR_WORK.md`.

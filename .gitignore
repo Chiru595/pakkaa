@@ -20,3 +20,6 @@ legacy/paidsafe/outbox/
 # os
 .DS_Store
 Thumbs.db
+
+# prior work, kept locally for porting
+legacy/

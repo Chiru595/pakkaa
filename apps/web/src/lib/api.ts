@@ -102,6 +102,7 @@ async function parseError(res: Response): Promise<ApiError> {
 let pendingRefresh: Promise<{ access_token: string; user: User } | null> | null = null
 
 export function refreshSession(): Promise<{ access_token: string; user: User } | null> {
+  if (!document.cookie.split('; ').includes('pk_session=1')) return Promise.resolve(null)
   pendingRefresh ??= (async () => {
     const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
     if (!res.ok) return null

@@ -6,6 +6,14 @@ import { Api, ROLE_LABEL, type Room, TEAM_ROLES } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { type ChatLine, connectChat, loadHistory, mergeLines, onChatStatus, sendText, subscribe } from '../lib/chat'
 
+function timeLabel(ms: number): string {
+  const d = new Date(ms)
+  const sameDay = d.toDateString() === new Date().toDateString()
+  return sameDay
+    ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+}
+
 function MembersSheet({ room, onClose }: { room: Room; onClose: () => void }) {
   const { user } = useAuth()
   const myRole = user?.orgs.find((o) => o.org_id === room.org_id)?.role
@@ -31,6 +39,7 @@ function MembersSheet({ room, onClose }: { room: Room; onClose: () => void }) {
       setCopied(true)
     } catch {
       setCopied(false)
+      setError('Copy is blocked in this browser. Select the link above and copy it.')
     }
   }
 
@@ -59,7 +68,7 @@ function MembersSheet({ room, onClose }: { room: Room; onClose: () => void }) {
         <div className="space-y-3 border-t border-slate-100 p-4">
           {invite ? (
             <>
-              <p className="break-all rounded-xl bg-slate-50 p-3 font-mono text-xs text-slate-700">{invite}</p>
+              <p className="select-all break-all rounded-xl bg-slate-50 p-3 font-mono text-xs text-slate-700">{invite}</p>
               <Button className="w-full" onClick={() => void copy()}>
                 {copied ? 'Copied' : 'Copy invite link'}
               </Button>
@@ -155,7 +164,8 @@ export default function RoomPage() {
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-semibold text-ink">{room?.title ?? 'Opening…'}</h1>
             <p className="text-xs text-slate-500">
-              {room ? (room.type === 'deal' ? 'Deal Room' : 'Pay Lane') : ''} · {room?.members.length ?? 0} people
+              {room ? (room.type === 'deal' ? 'Deal Room' : 'Pay Lane') : ''} · {room?.members.length ?? 0}{' '}
+              {room?.members.length === 1 ? 'person' : 'people'}
             </p>
           </div>
           <span className={`size-2.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-amber-400'}`} title={connected ? 'Live' : 'Connecting'} />
@@ -198,6 +208,9 @@ export default function RoomPage() {
                 >
                   {l.text}
                 </div>
+                <time className="mt-0.5 px-1 text-[11px] text-slate-400" dateTime={new Date(l.sentTime).toISOString()}>
+                  {timeLabel(l.sentTime)}
+                </time>
               </div>
             )
           })}
@@ -215,6 +228,7 @@ export default function RoomPage() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Message"
             aria-label="Message"
+            maxLength={4000}
             disabled={!room}
             className="min-w-0 flex-1 rounded-full border border-slate-300 px-4 py-2.5 text-[15px] focus:border-brand focus:outline-none"
           />

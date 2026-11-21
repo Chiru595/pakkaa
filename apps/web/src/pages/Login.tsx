@@ -1,9 +1,12 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Button, ErrorText, Field, Logo, Screen } from '../components/ui'
 import { Api, type OtpRequested } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { digitsOnlyPhone, formatPhone } from '../lib/phone'
+
+const RESEND_SECONDS = 30
 
 export default function Login({ context }: { context?: string }) {
   const { signIn } = useAuth()
@@ -14,18 +17,36 @@ export default function Login({ context }: { context?: string }) {
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [resendIn, setResendIn] = useState(0)
 
-  async function requestCode(e: FormEvent) {
-    e.preventDefault()
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const id = setTimeout(() => setResendIn((s) => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [resendIn])
+
+  const phoneValid = /^[6-9]\d{9}$/.test(phone)
+
+  async function sendCode() {
     setBusy(true)
     setError(null)
     try {
-      setOtp(await Api.requestOtp(phone))
+      setOtp(await Api.requestOtp(`+91${phone}`))
+      setResendIn(RESEND_SECONDS)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send the code')
     } finally {
       setBusy(false)
     }
+  }
+
+  function requestCode(e: FormEvent) {
+    e.preventDefault()
+    if (!phoneValid) {
+      setError('Enter a valid 10-digit Indian mobile number')
+      return
+    }
+    void sendCode()
   }
 
   async function verify(e: FormEvent) {
@@ -54,19 +75,33 @@ export default function Login({ context }: { context?: string }) {
 
         {!otp ? (
           <form onSubmit={requestCode} className="mt-8 space-y-4">
-            <Field
-              id="phone"
-              label="Mobile number"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="98765 43210"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
+            <div className="space-y-1.5">
+              <label htmlFor="phone" className="block text-sm font-medium text-ink">
+                Mobile number
+              </label>
+              <div className="flex overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+                <span className="grid place-items-center border-r border-slate-200 bg-slate-50 px-3 text-base text-slate-600">
+                  +91
+                </span>
+                <input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  placeholder="98765 43210"
+                  value={formatPhone(phone)}
+                  onChange={(e) => setPhone(digitsOnlyPhone(e.target.value))}
+                  required
+                  aria-describedby="phone-hint"
+                  className="min-w-0 flex-1 px-3 py-2.5 text-base tracking-wide text-ink placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+              <p id="phone-hint" className="text-xs text-slate-500">
+                10-digit Indian mobile number. We send a one-time code to verify it.
+              </p>
+            </div>
             <ErrorText>{error}</ErrorText>
-            <Button type="submit" className="w-full" busy={busy}>
+            <Button type="submit" className="w-full" busy={busy} disabled={!phoneValid}>
               Send code
             </Button>
           </form>
@@ -80,7 +115,7 @@ export default function Login({ context }: { context?: string }) {
             )}
             <Field
               id="code"
-              label={`Code sent to ••${otp.phone.slice(-4)}`}
+              label={`Code sent to +91 ${formatPhone(otp.phone.slice(-10))}`}
               inputMode="numeric"
               autoComplete="one-time-code"
               pattern="\d{6}"
@@ -90,7 +125,15 @@ export default function Login({ context }: { context?: string }) {
               required
             />
             {otp.is_new_user && (
-              <Field id="name" label="Your name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Field
+                id="name"
+                label="Your name"
+                autoComplete="name"
+                maxLength={80}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             )}
             {otp.needs_consent && (
               <label className="flex gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
@@ -112,19 +155,33 @@ export default function Login({ context }: { context?: string }) {
               </label>
             )}
             <ErrorText>{error}</ErrorText>
-            <Button type="submit" className="w-full" busy={busy}>
+            <Button type="submit" className="w-full" busy={busy} disabled={code.length !== 6}>
               Verify and continue
             </Button>
-            <button
-              type="button"
-              className="w-full text-sm text-slate-500 underline"
-              onClick={() => {
-                setOtp(null)
-                setCode('')
-              }}
-            >
-              Use a different number
-            </button>
+            <div className="flex justify-between text-sm">
+              <button
+                type="button"
+                className="text-slate-500 underline"
+                onClick={() => {
+                  setOtp(null)
+                  setCode('')
+                  setError(null)
+                }}
+              >
+                Change number
+              </button>
+              <button
+                type="button"
+                className="text-brand underline disabled:text-slate-400 disabled:no-underline"
+                disabled={resendIn > 0 || busy}
+                onClick={() => {
+                  setCode('')
+                  void sendCode()
+                }}
+              >
+                {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+              </button>
+            </div>
           </form>
         )}
       </div>

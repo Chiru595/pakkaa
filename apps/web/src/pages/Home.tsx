@@ -29,7 +29,16 @@ function CreateOrg() {
     <form onSubmit={submit} className="space-y-4 px-6 py-8">
       <h2 className="text-xl font-bold text-ink">Set up your workspace</h2>
       <p className="text-sm text-slate-600">Your business name. Clients and vendors will see it when you invite them.</p>
-      <Field id="org" label="Business name" placeholder="Acme Studio" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
+      <Field
+        id="org"
+        label="Business name"
+        placeholder="Acme Studio"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+        minLength={2}
+        maxLength={120}
+      />
       <ErrorText>{error}</ErrorText>
       <Button type="submit" className="w-full" busy={busy}>
         Create workspace
@@ -80,6 +89,7 @@ function NewRoom({ orgId, onCreated }: { orgId: string; onCreated: (room: Room) 
         onChange={(e) => setTitle(e.target.value)}
         required
         minLength={2}
+        maxLength={120}
         autoFocus
       />
       <ErrorText>{error}</ErrorText>
@@ -112,10 +122,34 @@ function RoomRow({ room }: { room: Room }) {
   )
 }
 
+const ORG_KEY = 'pakkaa.org'
+
+function readStoredOrg(): string | null {
+  try {
+    return localStorage.getItem(ORG_KEY)
+  } catch {
+    return null
+  }
+}
+
 export default function Home() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
-  const org = user?.orgs[0]
+  const [orgId, setOrgId] = useState<string | null>(readStoredOrg)
+  const org =
+    user?.orgs.find((o) => o.org_id === orgId) ??
+    user?.orgs.find((o) => TEAM_ROLES.includes(o.role)) ??
+    user?.orgs[0]
+
+  function switchOrg(id: string) {
+    setOrgId(id)
+    setRooms(null)
+    try {
+      localStorage.setItem(ORG_KEY, id)
+    } catch {
+      /* storage unavailable */
+    }
+  }
   const [rooms, setRooms] = useState<Room[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -152,8 +186,24 @@ export default function Home() {
           <div className="px-2">
             <p className="text-sm text-slate-500">Hi {user.name}</p>
             <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-              {org.org_name} <Badge>{ROLE_LABEL[org.role]}</Badge>
+              <span className="truncate">{org.org_name}</span> <Badge>{ROLE_LABEL[org.role]}</Badge>
             </h1>
+            {user.orgs.length > 1 && (
+              <label className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                Workspace
+                <select
+                  value={org.org_id}
+                  onChange={(e) => switchOrg(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
+                >
+                  {user.orgs.map((o) => (
+                    <option key={o.org_id} value={o.org_id}>
+                      {o.org_name} ({ROLE_LABEL[o.role]})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
           {isTeam && <NewRoom orgId={org.org_id} onCreated={(r) => navigate(`/rooms/${r.id}`)} />}
           <ErrorText>{error}</ErrorText>

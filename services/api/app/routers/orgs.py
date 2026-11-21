@@ -304,7 +304,28 @@ def accept_invite(token: str, user: User = Depends(current_user), db: Session = 
     label = "client" if side is RoomSide.CLIENT else "vendor"
     title = f"{user.name} joined as {label} (verified phone ••{user.phone_last4})"
     post_card(db, nexconn, settings, room, {"kind": "system", "v": 1, "title": title})
+    if side is RoomSide.CLIENT:
+        _warn_team_about_client(db, nexconn, settings, room, user)
     return _room_out(db, room, user.id, with_members=True)
+
+
+def _warn_team_about_client(db: Session, nexconn: NexconnClient, settings: Settings, room: Room, client: User) -> None:
+    """If the team has history with this client, only the team's side of the room sees a heads-up."""
+    from app.memory.signals import counterparty_notes
+
+    notes = counterparty_notes(db, room.org_id, [client.id])
+    if not notes:
+        return
+    team = db.execute(select(RoomMember).where(RoomMember.room_id == room.id,
+                                               RoomMember.side == RoomSide.PROVIDER)).scalars().all()
+    if not team:
+        return
+    post_card(db, nexconn, settings, room, {"kind": "memory_warning", "v": 1, "notes": notes[:3], "private": True,
+                                            "title": f"Heads-up about {client.name}: {notes[0]}"},
+              to_user_ids=[rm.user.chat_id for rm in team])
+    audit.record(db, "memory.warning_shown", org_id=room.org_id, subject_type="room", subject_id=room.id,
+                 payload={"client_id": client.id, "notes": len(notes)})
+    db.commit()
 
 
 # ---------- chat ----------

@@ -19,7 +19,7 @@ from app.llm import LLM, Lane, LLMUnavailable, untrusted
 from app.models import CopilotSuggestion, Room, RoomMember, User
 from app.schemas import MessageText
 from app.security import audit
-from app.security.deps import current_user, rate_limit, room_access
+from app.security.deps import current_user, membership_for, rate_limit, room_access
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rooms", tags=["copilot"])
@@ -69,7 +69,8 @@ def suggest(room_id: str, body: SuggestIn, user: User = Depends(current_user), d
             llm: LLM = Depends(get_llm_dep)) -> StreamingResponse:
     """Streams up to three reply options as server-sent events, private to the caller."""
     room, member = _participant(db, user, room_id)
-    data = C.build_context(db, room, user, member).render()
+    role = getattr(membership_for(db, user.id, room.org_id), "role", None)
+    data = C.build_context(db, room, user, member, llm, role).render()
     db.commit()
     user_id, room_pk = user.id, room.id
 

@@ -49,9 +49,14 @@ Return confidence between 0 and 1 and quote the exact words you relied on (max 3
 Return an empty list when nothing in the NEW message settles a term."""
 
 
-def build_input(room: Room, sheet_terms: dict, history: list[tuple[str, str]], new: tuple[str, str]) -> str:
+def build_input(room: Room, sheet_terms: dict, history: list[tuple[str, str]], new: tuple[str, str],
+                corrections: list[str] | None = None) -> str:
     current = {k: T.display(k, v) for k, v in T.values(sheet_terms).items()}
-    lines = [f"Deal: {room.title}", f"Current term sheet: {current or 'empty'}", "Recent messages (oldest first):"]
+    lines = [f"Deal: {room.title}", f"Current term sheet: {current or 'empty'}"]
+    if corrections:
+        lines.append("Past corrections people made to your readings in this workspace (avoid repeating them):")
+        lines += [untrusted("correction", c) for c in corrections]
+    lines.append("Recent messages (oldest first):")
     lines += [untrusted(f"{side} message", text) for side, text in history]
     lines += ["NEW message:", untrusted(f"{new[0]} message", new[1])]
     return "\n".join(lines)
@@ -70,7 +75,11 @@ def run(db: Session, llm: LLM, nexconn: NexconnClient, settings: Settings, room_
         ChatMessage.room_id == room.id, ChatMessage.kind == MessageKind.TEXT, ChatMessage.created_at < msg.created_at)
         .order_by(ChatMessage.created_at.desc()).limit(CONTEXT_MESSAGES)).scalars().all()
     history = [(sides.get(m.sender_user_id or "", "unknown"), m.body) for m in reversed(recent)]
-    data = build_input(room, sheet.terms, history, (sides.get(msg.sender_user_id or "", "unknown"), msg.body))
+    from app.memory.store import scribe_corrections
+
+    corrections = [m.text for m in scribe_corrections(db, room.org_id)]
+    data = build_input(room, sheet.terms, history, (sides.get(msg.sender_user_id or "", "unknown"), msg.body),
+                       corrections)
     try:
         out = llm.structured(Lane.SMART, TASK, data, ScribeOut, max_output_tokens=800, purpose="scribe")
     except LLMUnavailable as exc:

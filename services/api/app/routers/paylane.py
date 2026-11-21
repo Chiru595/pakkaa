@@ -14,10 +14,13 @@ from app.db import get_db, utcnow
 from app.deps import get_llm_dep, get_nexconn
 from app.domain import paylane as P
 from app.domain import terms as T
+from app.domain.policy import TUNABLES, effective_risk, set_threshold
+from app.domain.policy import history as policy_history
 from app.domain.risk import IST, name_collisions, policy
 from app.domain.rooms import post_card
 from app.integrations.nexconn import NexconnClient
 from app.llm import LLM
+from app.memory import signals as memory_signals
 from app.models import (
     TEAM_ROLES,
     CardState,
@@ -137,10 +140,18 @@ class ParseOut(BaseModel):
 
 class ApproveIn(BaseModel):
     version: int = Field(ge=1)
+    override_reason: str | None = Field(default=None, max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
 
 
 class RejectIn(BaseModel):
-    note: str = Field(default="", max_length=200)
+    note: str = Field(default="", max_length=200, pattern=r"^[^\x00-\x1f\x7f]*$")
+    suspected_fraud: bool = False
+
+
+class ThresholdIn(BaseModel):
+    key: Literal["high_at", "medium_at", "baseline_multiplier", "bank_change_window_days", "no_baseline_large_rupees"]
+    value: float = Field(gt=0, le=1_000_000)
+    reason: str = Field(default="", max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
 
 
 class BriefOut(BaseModel):
@@ -401,9 +412,12 @@ def edit_card(card_id: str, body: CardEdit, user: User = Depends(current_user), 
 
 @router.post("/cards/{card_id}/approve", response_model=CardOut)
 def approve_card(card_id: str, body: ApproveIn, user: User = Depends(current_user), db: Session = Depends(get_db),
-                 settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
+                 settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
+                 llm: LLM = Depends(get_llm_dep)) -> CardOut:
     card, m = _card(db, user, card_id)
-    done = P.approve(db, card, user, m, body.version)
+    done = P.approve(db, card, user, m, body.version, body.override_reason)
+    if card.risk_level == "high" and body.override_reason:
+        memory_signals.risk_override(db, llm, card, user, " ".join(body.override_reason.split()))
     db.commit()
     have = len(P.approvals(db, card))
     _notify(db, nexconn, settings, card, f"Card #{card.number} approved by {user.name} ({have} of "
@@ -415,7 +429,7 @@ def approve_card(card_id: str, body: ApproveIn, user: User = Depends(current_use
 def reject_card(card_id: str, body: RejectIn, user: User = Depends(current_user), db: Session = Depends(get_db),
                 settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
     card, m = _card(db, user, card_id)
-    P.reject(db, card, user, m, body.note)
+    P.reject(db, card, user, m, " ".join(body.note.split()), body.suspected_fraud)
     db.commit()
     _notify(db, nexconn, settings, card, f"Card #{card.number} {card.state} by {user.name}")
     return card_out(db, card, user, m)
@@ -531,13 +545,17 @@ def complete_verify_call(card_id: str, call_id: str, body: VerifyDoneIn, user: U
 @router.post("/cards/{card_id}/payout", response_model=CardOut, dependencies=[Depends(rate_limit("payout", 20, 60))])
 def payout(card_id: str, body: PayoutIn, user: User = Depends(current_user), db: Session = Depends(get_db),
            settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
-           provider: PaymentProvider = Depends(get_payment_provider)) -> CardOut:
+           provider: PaymentProvider = Depends(get_payment_provider), llm: LLM = Depends(get_llm_dep)) -> CardOut:
     card = db.execute(select(PaymentCard).where(PaymentCard.id == card_id).with_for_update()
                       .execution_options(populate_existing=True)).scalar_one_or_none()
     if card is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     card, m = _card(db, user, card_id)
     row, created = P.payout(db, card, user, m, body.idempotency_key, provider)
+    if created and card.payee_id:
+        paid_to = db.get(Payee, card.payee_id)
+        if paid_to is not None:
+            memory_signals.payout_made(db, llm, card, paid_to, user)
     db.commit()
     if created:
         payee = db.get(Payee, card.payee_id) if card.payee_id else None
@@ -550,8 +568,28 @@ def payout(card_id: str, body: PayoutIn, user: User = Depends(current_user), db:
 def get_policy(org_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict[str, Any]:
     require_org_role(db, user, org_id, TEAM_ROLES)
     pack = policy()
+    risk = effective_risk(db, org_id)
+    names = {u.id: u.name for u in db.execute(select(User).where(User.id.in_(
+        [h.set_by for h in policy_history(db, org_id) if h.set_by]))).scalars()}
     return {"approval_bands": pack["approval_bands"], "approver_roles": pack["approver_roles"],
-            "source": pack["source"], "as_of": pack["as_of"], "disclaimer": pack["disclaimer"]}
+            "source": pack["source"], "as_of": pack["as_of"], "disclaimer": pack["disclaimer"],
+            "thresholds": [{"key": k, "label": t.label, "value": risk[k], "default": pack["risk"][k],
+                            "lower_is_tighter": t.lower_is_tighter, "min": t.minimum, "max": t.maximum}
+                           for k, t in TUNABLES.items()],
+            "changes": [{"key": h.key, "from": h.previous, "to": h.value, "direction": h.direction,
+                         "source": h.source, "reason": h.reason, "by": names.get(h.set_by or ""),
+                         "at": h.created_at.isoformat()} for h in policy_history(db, org_id)]}
+
+
+@router.put("/orgs/{org_id}/policy/thresholds", dependencies=[Depends(rate_limit("policy", 20, 60))])
+def set_policy_threshold(org_id: str, body: ThresholdIn, user: User = Depends(current_user),
+                         db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Tightening: owner or finance. Loosening: owner only, with a reason. Every change is audited."""
+    m = require_org_role(db, user, org_id, TEAM_ROLES)
+    set_threshold(db, org_id, body.key, body.value, source="person", reason=body.reason, actor_id=user.id,
+                  actor_role=m.role)
+    db.commit()
+    return get_policy(org_id, user, db)
 
 
 class AskIn(BaseModel):

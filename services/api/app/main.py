@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, copilot, deals, messages, orgs, payees, paylane, signing, webhooks
+from app.routers import auth, copilot, deals, memory, messages, orgs, payees, paylane, signing, webhooks
 
 
 def create_app() -> FastAPI:
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(signing.router)
     app.include_router(payees.router)
     app.include_router(paylane.router)
+    app.include_router(memory.router)
     app.include_router(webhooks.router)
     return app
 

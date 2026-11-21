@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_db, utcnow
-from app.deps import get_nexconn
+from app.deps import get_llm_dep, get_nexconn
 from app.domain import terms as T
 from app.domain.deal import (
     current_hash,
@@ -24,21 +24,27 @@ from app.domain.deal import (
 from app.domain.fair_price import assess
 from app.domain.rooms import post_card
 from app.integrations.nexconn import NexconnClient
+from app.llm import LLM
+from app.memory import signals as memory_signals
 from app.models import (
+    TEAM_ROLES,
     ChatMessage,
     CopilotProfile,
+    DealOutcome,
     PaymentLink,
     ProposalStatus,
     Room,
     RoomMember,
+    RoomSide,
     TermProposal,
     TermSheet,
+    TermSheetStatus,
     User,
 )
 from app.money import MAX_AMOUNT_PAISE, format_inr
 from app.rules import load_pack
 from app.security import audit
-from app.security.deps import current_user, room_access
+from app.security.deps import current_user, membership_for, rate_limit, room_access
 
 router = APIRouter(prefix="/api/rooms", tags=["deals"])
 
@@ -96,6 +102,14 @@ class TermSheetOut(BaseModel):
     signatures: list[SignatureOut]
 
 
+class OutcomeOut(BaseModel):
+    outcome: str
+    first_ask_display: str | None
+    final_display: str | None
+    note: str | None
+    recorded_at: datetime
+
+
 class DealOut(BaseModel):
     room_id: str
     my_side: str
@@ -103,6 +117,13 @@ class DealOut(BaseModel):
     proposals: list[ProposalOut]
     advance_link: PaymentLinkOut | None
     disclaimer: str
+    counterparty_notes: list[str] = []
+    outcome: OutcomeOut | None = None
+
+
+class OutcomeIn(BaseModel):
+    outcome: Literal["won", "lost"]
+    note: str | None = Field(default=None, max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
 
 
 class TermUpdate(BaseModel):
@@ -197,7 +218,30 @@ def deal_out(db: Session, room: Room, member: RoomMember) -> DealOut:
                                source_message_id=(_message_ref(db, [p.source_message_id]) or [None])[0]
                                if p.source_message_id else None) for p in pending],
         advance_link=link_out(link, f"{get_settings().public_url}/pay/{link.public_token}") if link else None,
-        disclaimer=DISCLAIMER)
+        disclaimer=DISCLAIMER, counterparty_notes=_counterparty_notes(db, room, member),
+        outcome=_outcome_out(db, room))
+
+
+def _counterparty_notes(db: Session, room: Room, member: RoomMember) -> list[str]:
+    """Only the team's own side sees what the team remembers about its client."""
+    if member.side != RoomSide.PROVIDER:
+        return []
+    m = membership_for(db, member.user_id, room.org_id)
+    if m is None or m.role not in TEAM_ROLES:
+        return []
+    clients = db.execute(select(RoomMember.user_id).where(RoomMember.room_id == room.id,
+                                                          RoomMember.side == RoomSide.CLIENT)).scalars().all()
+    return memory_signals.counterparty_notes(db, room.org_id, list(clients))
+
+
+def _outcome_out(db: Session, room: Room) -> OutcomeOut | None:
+    o = db.get(DealOutcome, room.id)
+    if o is None:
+        return None
+    return OutcomeOut(outcome=o.outcome,
+                      first_ask_display=format_inr(o.first_ask_paise) if o.first_ask_paise else None,
+                      final_display=format_inr(o.final_paise) if o.final_paise else None, note=o.note,
+                      recorded_at=o.created_at)
 
 
 @router.get("/{room_id}/deal", response_model=DealOut)
@@ -210,7 +254,8 @@ def get_deal(room_id: str, user: User = Depends(current_user), db: Session = Dep
 
 @router.patch("/{room_id}/term-sheet", response_model=DealOut)
 def update_term(room_id: str, body: TermUpdate, user: User = Depends(current_user), db: Session = Depends(get_db),
-                settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> DealOut:
+                settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
+                llm: LLM = Depends(get_llm_dep)) -> DealOut:
     room, member = _context(db, user, room_id)
     sheet = get_sheet(db, room, lock=True)
     was_locked = sheet.status == "locked"
@@ -218,6 +263,8 @@ def update_term(room_id: str, body: TermUpdate, user: User = Depends(current_use
         changed = set_term(db, room, sheet, body.key, body.value, user, via="manual")
     except T.TermValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if changed:
+        memory_signals.manual_correction(db, llm, room, body.key, sheet.terms[body.key]["value"], user)
     db.commit()
     if changed:
         note = " The earlier lock is void; both sides must sign again." if was_locked else ""
@@ -231,7 +278,7 @@ def update_term(room_id: str, body: TermUpdate, user: User = Depends(current_use
 @router.post("/{room_id}/proposals/{proposal_id}/{decision}", response_model=DealOut)
 def decide(room_id: str, proposal_id: str, decision: str, user: User = Depends(current_user),
            db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
-           nexconn: NexconnClient = Depends(get_nexconn)) -> DealOut:
+           nexconn: NexconnClient = Depends(get_nexconn), llm: LLM = Depends(get_llm_dep)) -> DealOut:
     if decision not in ("accept", "reject"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     room, member = _context(db, user, room_id)
@@ -240,6 +287,8 @@ def decide(room_id: str, proposal_id: str, decision: str, user: User = Depends(c
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     sheet = get_sheet(db, room, lock=True)
     decide_proposal(db, room, sheet, proposal, user, decision == "accept")
+    if decision == "reject":
+        memory_signals.proposal_rejected(db, llm, room, proposal, user)
     db.commit()
     if decision == "accept":
         post_card(db, nexconn, settings, room, {
@@ -305,3 +354,42 @@ def lock_review(room_id: str, user: User = Depends(current_user),
     db.commit()
     items = T.review(sheet.terms, pending)
     return [ReviewItemOut(level=i.level, term_key=i.term_key, message=i.message) for i in items]
+
+
+@router.post("/{room_id}/outcome", response_model=DealOut, dependencies=[Depends(rate_limit("outcome", 20, 60))])
+def record_outcome(room_id: str, body: OutcomeIn, user: User = Depends(current_user), db: Session = Depends(get_db),
+                   settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
+                   llm: LLM = Depends(get_llm_dep)) -> DealOut:
+    """The freelancer's team records how the deal ended, so the next negotiation can learn from it."""
+    room, membership, member = room_access(db, user, room_id)
+    require_deal_room(room)
+    if member is None or member.side != RoomSide.PROVIDER or membership.role not in TEAM_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the freelancer's team records the outcome")
+    if db.get(DealOutcome, room.id) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The outcome is already recorded")
+    sheet = get_sheet(db, room, lock=True)
+    price = T.values(sheet.terms).get("price_paise")
+    if body.outcome == "won" and sheet.status != TermSheetStatus.LOCKED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "A deal is won once both sides have locked the terms")
+    note = " ".join(body.note.split()) if body.note else None
+    outcome = DealOutcome(room_id=room.id, org_id=room.org_id, outcome=body.outcome,
+                          first_ask_paise=memory_signals.first_ask_paise(db, sheet),
+                          final_paise=int(price) if price and body.outcome == "won" else None, note=note or None,
+                          recorded_by=user.id)
+    db.add(outcome)
+    db.flush()
+    audit.record(db, "deal.outcome", actor_user_id=user.id, org_id=room.org_id, subject_type="room",
+                 subject_id=room.id, payload={"outcome": body.outcome, "first_ask_paise": outcome.first_ask_paise,
+                                              "final_paise": outcome.final_paise})
+    memory_signals.deal_outcome(db, llm, room, sheet, outcome, user)
+    db.commit()
+    post_card(db, nexconn, settings, room, {"kind": "outcome", "v": 1, "outcome": body.outcome,
+                                            "title": f"{user.name} marked this deal as {body.outcome}"},
+              to_user_ids=team_side_chat_ids(db, room))
+    return deal_out(db, room, member)
+
+
+def team_side_chat_ids(db: Session, room: Room) -> list[str]:
+    rows = db.execute(select(RoomMember).where(RoomMember.room_id == room.id,
+                                               RoomMember.side == RoomSide.PROVIDER)).scalars()
+    return [rm.user.chat_id for rm in rows]

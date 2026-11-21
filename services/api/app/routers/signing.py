@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_db, utcnow
-from app.deps import get_nexconn
+from app.deps import get_llm_dep, get_nexconn
 from app.domain import terms as T
 from app.domain.deal import current_hash, get_sheet, require_deal_room, require_participant, signatures
 from app.domain.rooms import post_card
 from app.integrations.nexconn import NexconnClient
+from app.llm import LLM
+from app.memory.signals import advance_paid
 from app.models import (
     TEAM_ROLES,
     Org,
@@ -209,8 +211,8 @@ def pay_page(token: str, db: Session = Depends(get_db)) -> PayPage:
 
 @router.post("/pay/{token}/simulate", response_model=PayPage, dependencies=[Depends(rate_limit("pay", 60, 60))])
 def simulate_payment(token: str, body: SimulateIn, db: Session = Depends(get_db),
-                     settings: Settings = Depends(get_settings),
-                     nexconn: NexconnClient = Depends(get_nexconn)) -> PayPage:
+                     settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
+                     llm: LLM = Depends(get_llm_dep)) -> PayPage:
     """Stands in for the gateway's signed callback. Idempotent: a paid link stays paid."""
     link = _link_by_token(db, token, lock=True)
     if link.provider != "simulated":
@@ -221,6 +223,8 @@ def simulate_payment(token: str, body: SimulateIn, db: Session = Depends(get_db)
     link.paid_at = utcnow() if body.outcome == "paid" else None
     audit.record(db, f"payment_link.{link.status}", org_id=link.org_id, subject_type="payment_link",
                  subject_id=link.id, payload={"amount_paise": link.amount_paise, "provider_ref": link.provider_ref})
+    if link.status == PaymentStatus.PAID:
+        advance_paid(db, llm, link)
     db.commit()
     room = db.get(Room, link.room_id)
     if room is not None:

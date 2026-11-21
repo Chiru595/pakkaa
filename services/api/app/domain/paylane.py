@@ -134,8 +134,13 @@ def edit_card(db: Session, card: PaymentCard, actor: User, membership: Membershi
     return True
 
 
-def approve(db: Session, card: PaymentCard, actor: User, membership: Membership, version: int) -> bool:
-    """Returns True when this approval completes the policy and the card becomes approved."""
+OVERRIDE_REASON_MIN = 10
+
+
+def approve(db: Session, card: PaymentCard, actor: User, membership: Membership, version: int,
+            override_reason: str | None = None) -> bool:
+    """Returns True when this approval completes the policy and the card becomes approved.
+    Approving a high-risk card needs a written reason, which is kept as an override the team can learn from."""
     require_not_frozen(db, card.org_id)
     if membership.role not in APPROVER_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and finance can approve payments")
@@ -157,7 +162,12 @@ def approve(db: Session, card: PaymentCard, actor: User, membership: Membership,
     current = approvals(db, card)
     if any(a.approver_id == actor.id for a in current):
         raise HTTPException(status.HTTP_409_CONFLICT, "You already approved this version")
-    db.add(CardApproval(card_id=card.id, card_version=card.version, approver_id=actor.id, role=membership.role))
+    reason = " ".join((override_reason or "").split()) or None
+    if card.risk_level == "high" and (reason is None or len(reason) < OVERRIDE_REASON_MIN):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            "High risk: write why you are approving anyway (at least 10 characters)")
+    db.add(CardApproval(card_id=card.id, card_version=card.version, approver_id=actor.id, role=membership.role,
+                        override_reason=reason if card.risk_level == "high" else None))
     db.flush()
     current = approvals(db, card)
     owner_ok = not card.owner_approval_required or any(a.role == "owner" for a in current)
@@ -166,7 +176,8 @@ def approve(db: Session, card: PaymentCard, actor: User, membership: Membership,
         card.state, card.decided_at = CardState.APPROVED, utcnow()
     audit.record(db, "card.approve", actor_user_id=actor.id, org_id=card.org_id, subject_type="payment_card",
                  subject_id=card.id, payload={"version": card.version, "approvals": len(current),
-                                              "required": card.required_approvals, "complete": done})
+                                              "required": card.required_approvals, "complete": done,
+                                              "override_reason": reason if card.risk_level == "high" else None})
     return done
 
 
@@ -234,7 +245,8 @@ def vote_unfreeze(db: Session, org_id: str, actor: User, membership: Membership)
     return c
 
 
-def reject(db: Session, card: PaymentCard, actor: User, membership: Membership, note: str) -> None:
+def reject(db: Session, card: PaymentCard, actor: User, membership: Membership, note: str,
+           suspected_fraud: bool = False) -> None:
     if membership.role not in APPROVER_ROLES and actor.id != card.requester_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only approvers or the requester can reject this card")
     if card.state not in (CardState.PENDING, CardState.APPROVED, CardState.UNVERIFIED):
@@ -242,4 +254,11 @@ def reject(db: Session, card: PaymentCard, actor: User, membership: Membership, 
     card.state = CardState.DISMISSED if card.state == CardState.UNVERIFIED else CardState.REJECTED
     card.decided_at = utcnow()
     audit.record(db, "card.reject", actor_user_id=actor.id, org_id=card.org_id, subject_type="payment_card",
-                 subject_id=card.id, payload={"note": note[:200], "state": card.state})
+                 subject_id=card.id, payload={"note": note[:200], "state": card.state,
+                                              "suspected_fraud": suspected_fraud})
+    if suspected_fraud:
+        if membership.role not in APPROVER_ROLES:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and finance can mark a card as fraud")
+        from app.domain.policy import learn_from_fraud
+
+        learn_from_fraud(db, card, actor.id)

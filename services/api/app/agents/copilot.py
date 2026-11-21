@@ -15,8 +15,19 @@ from sqlalchemy.orm import Session
 
 from app.domain import terms as T
 from app.domain.deal import get_sheet
-from app.llm import untrusted
-from app.models import ChatMessage, CopilotProfile, MessageKind, Room, RoomMember, TermSheet, TermSheetStatus, User
+from app.llm import LLM, untrusted
+from app.models import (
+    TEAM_ROLES,
+    ChatMessage,
+    CopilotProfile,
+    MemoryKind,
+    MessageKind,
+    Room,
+    RoomMember,
+    TermSheet,
+    TermSheetStatus,
+    User,
+)
 from app.money import amounts_in_text, format_inr
 from app.rules import load_pack
 
@@ -48,6 +59,9 @@ class CopilotContext:
     transcript: list[tuple[str, str]]
     own_history: list[str] = field(default_factory=list)
     band: str | None = None
+    memories: list[str] = field(default_factory=list)
+    counterparty: list[str] = field(default_factory=list)
+    preferred_tactics: list[str] = field(default_factory=list)
 
     def render(self) -> str:
         role = "freelancer / seller" if self.side == "provider" else "client / buyer"
@@ -66,12 +80,21 @@ class CopilotContext:
         if self.band:
             lines.append(f"Ledger rate band: {self.band}")
         lines += [f"My history: {h}" for h in self.own_history]
+        if self.memories:
+            lines.append("What my side learned from past deals (private, never quote it to the other side):")
+            lines += [untrusted("past deal note", m) for m in self.memories]
+        if self.counterparty:
+            lines.append("What my team knows about this counterparty (private, never mention it to them):")
+            lines += [untrusted("counterparty note", m) for m in self.counterparty]
+        if self.preferred_tactics:
+            lines.append("Tactics I usually pick, most used first: " + ", ".join(self.preferred_tactics))
         lines.append("Conversation so far (oldest first):")
         lines += [untrusted(f"{who} said", text) for who, text in self.transcript]
         return "\n".join(lines)
 
 
-def build_context(db: Session, room: Room, user: User, member: RoomMember) -> CopilotContext:
+def build_context(db: Session, room: Room, user: User, member: RoomMember, llm: LLM | None = None,
+                  role: str | None = None) -> CopilotContext:
     sheet = get_sheet(db, room)
     profile = db.get(CopilotProfile, (room.id, user.id))
     rows = db.execute(select(ChatMessage).where(ChatMessage.room_id == room.id, ChatMessage.kind == MessageKind.TEXT)
@@ -89,7 +112,26 @@ def build_context(db: Session, room: Room, user: User, member: RoomMember) -> Co
         ctx.band = (f"{cat['label']} per {cat['unit']}: typical ₹{cat['p25']:,} to ₹{cat['p75']:,}, "
                     f"middle ₹{cat['p50']:,} (indicative, as of {pack['as_of']})")
     ctx.own_history = _own_history(db, room, user, member, sheet.category)
+    _add_memory(db, llm, ctx, room, user, member, role)
     return ctx
+
+
+def _add_memory(db: Session, llm: LLM | None, ctx: CopilotContext, room: Room, user: User, member: RoomMember,
+                role: str | None) -> None:
+    """Team memory reaches the copilot only for the team's own side; guests see only their private items."""
+    from app.memory import store
+    from app.memory.signals import counterparty_notes
+
+    role = role or ""
+    query = " ".join([room.title, *[text for _, text in ctx.transcript[-4:]]])
+    items = store.recall(db, llm, org_id=room.org_id, viewer_id=user.id, viewer_role=role, query=query,
+                         kinds=[MemoryKind.PLAYBOOK], limit=3, exclude_source_ids=[room.id])
+    ctx.memories = [m.text for m in items]
+    if member.side == "provider" and role in TEAM_ROLES:
+        clients = db.execute(select(RoomMember.user_id).where(RoomMember.room_id == room.id,
+                                                              RoomMember.side == "client")).scalars().all()
+        ctx.counterparty = counterparty_notes(db, room.org_id, list(clients))[:3]
+    ctx.preferred_tactics = store.tactic_preferences(db, user.id)[:3]
 
 
 def _own_history(db: Session, room: Room, user: User, member: RoomMember, category: str | None) -> list[str]:
@@ -111,6 +153,8 @@ in the same language and tone as the conversation (English, Hindi or Hinglish). 
 as-is, under 60 words, polite and professional. Use different tactics across the three. Never reveal my private
 prices or notes in a reply. Never invent facts, deadlines or prices that are not in the context; amounts you suggest
 must respect my lowest acceptable price or highest budget. "why" is one short line explaining the tactic to me.
+If tactics I usually pick are listed, make the first option use the first of them when it fits the conversation.
+Use past deal and counterparty notes only to shape the advice; never mention them in a reply.
 Tactics: hold_price, trade_scope (offer less scope for less money, or more for more), ask_question, counter_offer,
 accept, clarify."""
 

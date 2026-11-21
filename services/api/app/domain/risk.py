@@ -75,9 +75,10 @@ def assess(db: Session, *, org_id: str, card_id: str | None, payee_id: str | Non
            requester_id: str | None, requester_role: str | None, extra_text: str = "",
            deal_room_id: str | None = None) -> Assessment:
     from app.domain import terms as T
+    from app.domain.policy import effective_risk
     from app.models import CardState, Payee, PaymentCard, Room, TermSheet, User
 
-    p = policy()["risk"]
+    p = effective_risk(db, org_id)
     now = utcnow()
     signals: list[Signal] = []
     paid_q = select(PaymentCard).where(PaymentCard.org_id == org_id, PaymentCard.state == CardState.PAID)
@@ -112,6 +113,14 @@ def assess(db: Session, *, org_id: str, card_id: str | None, payee_id: str | Non
                                       f"{format_inr(amount_paise)} is above the usual {format_inr(base)} for "
                                       f"{payee.name}", {"baseline_paise": base, "payments": len(history),
                                                         "last_paid": history[-1].created_at.date().isoformat()}))
+        if len(history) >= 3:
+            gaps = [(b.created_at - a.created_at).days for a, b in zip(history, history[1:], strict=False)]
+            usual = median(gaps)
+            since = (now - history[-1].created_at).days
+            if usual >= 7 and since < usual * 0.4:
+                signals.append(Signal("unusual_timing", 10,
+                                      f"{payee.name} was paid {since} day(s) ago; usually every {round(usual)} days",
+                                      {"days_since_last": since, "usual_gap_days": round(usual)}))
         if payee.details_changed_at and now - payee.details_changed_at < timedelta(days=p["bank_change_window_days"]):
             signals.append(Signal("bank_changed", 35,
                                   f"Bank/UPI details changed on {payee.details_changed_at.astimezone(IST):%d %b %Y}",

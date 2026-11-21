@@ -4,7 +4,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, UniqueConstraint
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import BigInteger, Float, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -345,6 +346,7 @@ class CardApproval(Base):
     card_version: Mapped[int]
     approver_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     role: Mapped[str] = mapped_column(String(20))
+    override_reason: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
@@ -400,3 +402,79 @@ class OrgControl(Base):
     reason: Mapped[str | None] = mapped_column(String(300))
     unfreeze_votes: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     card_seq: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+EMBEDDING_DIMENSIONS = 1536
+
+
+class MemoryKind(StrEnum):
+    PLAYBOOK = "playbook"
+    CORRECTION = "correction"
+    COUNTERPARTY = "counterparty"
+    PREFERENCE = "preference"
+    PAYEE = "payee"
+    RISK_OVERRIDE = "risk_override"
+
+
+class MemoryVisibility(StrEnum):
+    TEAM = "team"
+    PRIVATE = "private"
+
+
+class MemoryItem(Base):
+    """Something the workspace learned. Scoped to one org; private items are visible only to their owner.
+    Every item points back to the interaction it came from."""
+
+    __tablename__ = "memory_items"
+    __table_args__ = (
+        Index("ix_memory_org_kind", "org_id", "kind", "created_at"),
+        Index("ix_memory_org_subject", "org_id", "subject_type", "subject_id"),
+    )
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"))
+    visibility: Mapped[str] = mapped_column(String(10))
+    owner_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(20))
+    subject_type: Mapped[str | None] = mapped_column(String(20))
+    subject_id: Mapped[str | None] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(String(1000))
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    source_type: Mapped[str] = mapped_column(String(30))
+    source_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class DealOutcomeKind(StrEnum):
+    WON = "won"
+    LOST = "lost"
+
+
+class DealOutcome(Base):
+    __tablename__ = "deal_outcomes"
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    outcome: Mapped[str] = mapped_column(String(10))
+    first_ask_paise: Mapped[int | None] = mapped_column(BigInteger)
+    final_paise: Mapped[int | None] = mapped_column(BigInteger)
+    note: Mapped[str | None] = mapped_column(String(300))
+    recorded_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class PolicyOverride(Base):
+    """A change to a risk threshold. Learning may only tighten; loosening needs an owner and a reason."""
+
+    __tablename__ = "policy_overrides"
+    __table_args__ = (Index("ix_policy_overrides_org_key", "org_id", "key", "created_at"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(String(40))
+    value: Mapped[float] = mapped_column(Float)
+    previous: Mapped[float] = mapped_column(Float)
+    direction: Mapped[str] = mapped_column(String(10))
+    source: Mapped[str] = mapped_column(String(10))
+    reason: Mapped[str] = mapped_column(String(300))
+    set_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    source_id: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

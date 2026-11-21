@@ -131,7 +131,11 @@ def test_bank_change_plus_urgency_is_high_risk_and_needs_verify_call(client, tea
                        json={"outcome": "confirmed", "notes": "Mo confirmed on call", "duration_s": 75},
                        headers=team["finance"]["headers"]).json()
     assert done["verify_call"]["outcome"] == "confirmed" and done["viewer"]["can_approve"]
-    assert act(client, team, "finance", card, "approve", version=1).status_code == 200
+    assert act(client, team, "finance", card, "approve", version=1).status_code == 400
+    assert act(client, team, "finance", card, "approve", version=1, override_reason="  ok  ").status_code == 400
+    r = act(client, team, "finance", card, "approve", version=1,
+            override_reason="Mo confirmed the new bank on a verify call")
+    assert r.status_code == 200
 
 
 def test_impostor_with_owner_name_is_blocked(client, team, login_as, llm, db, nexconn):

@@ -282,7 +282,7 @@ export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }
             )}
           </>
         ) : tab === 'learning' ? (
-          <LearningPanel orgId={orgId} />
+          <LearningPanel orgId={orgId} canAudit={canEditPayees} />
         ) : (
           <>
             <ul className="divide-y divide-slate-100">

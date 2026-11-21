@@ -271,7 +271,11 @@ def test_card_input_validation(client, team):
                  {"payee_id": team["payee"]["id"], "amount_paise": 100, "reason": "bad\nline"}]:
         assert client.post(url, json=body, headers=h).status_code == 422, body
     assert client.post(url, json={"payee_id": "nope", "amount_paise": 100, "reason": "test"},
+                       headers=h).status_code == 422
+    assert client.post(url, json={"payee_id": "0" * 32, "amount_paise": 100, "reason": "test"},
                        headers=h).status_code == 400
+    assert client.post(url, json={"payee_id": team["payee"]["id"], "amount_paise": 100, "reason": "   "},
+                       headers=h).status_code == 422
     assert client.post(f"/api/cards/{'x' * 32}/payout", json={"idempotency_key": "short"},
                        headers=h).status_code == 422
 

@@ -17,7 +17,7 @@ from app.deps import get_llm_dep
 from app.domain.deal import require_deal_room, require_participant
 from app.llm import LLM, Lane, LLMUnavailable, untrusted
 from app.models import CopilotSuggestion, Room, RoomMember, User
-from app.schemas import MessageText
+from app.schemas import ClientRef, MessageText, bounded_text
 from app.security import audit
 from app.security.deps import current_user, membership_for, rate_limit, room_access
 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/rooms", tags=["copilot"])
 
 
 class SuggestIn(BaseModel):
-    trigger_message_id: str | None = Field(default=None, max_length=64)
+    trigger_message_id: ClientRef | None = None
 
 
 class FeedbackIn(BaseModel):
@@ -45,7 +45,7 @@ class WarningOut(BaseModel):
 
 
 class ExplainIn(BaseModel):
-    text: str = Field(min_length=3, max_length=1500)
+    text: bounded_text(3, 1500, multiline=True)  # type: ignore[valid-type]
     language: Literal["en", "hi", "hinglish"] = "en"
 
 
@@ -97,7 +97,8 @@ def suggest(room_id: str, body: SuggestIn, user: User = Depends(current_user), d
                              headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
-@router.post("/{room_id}/copilot/suggestions/{suggestion_id}/feedback", status_code=204)
+@router.post("/{room_id}/copilot/suggestions/{suggestion_id}/feedback", status_code=204,
+             dependencies=[Depends(rate_limit("feedback", 120, 60))])
 def feedback(room_id: str, suggestion_id: str, body: FeedbackIn, user: User = Depends(current_user),
              db: Session = Depends(get_db)) -> None:
     room, _ = _participant(db, user, room_id)

@@ -14,7 +14,7 @@ from app.domain import validators as V
 from app.models import TEAM_ROLES, Payee, User
 from app.schemas import PersonName
 from app.security import audit, crypto
-from app.security.deps import current_user, require_org_role
+from app.security.deps import current_user, rate_limit, require_org_role
 
 router = APIRouter(prefix="/api/orgs", tags=["payees"])
 
@@ -94,7 +94,8 @@ def list_payees(org_id: str, user: User = Depends(current_user), db: Session = D
     return [payee_out(p) for p in rows]
 
 
-@router.post("/{org_id}/payees", response_model=PayeeOut, status_code=201)
+@router.post("/{org_id}/payees", response_model=PayeeOut, status_code=201,
+             dependencies=[Depends(rate_limit("payee", 20, 600))])
 def add_payee(org_id: str, body: PayeeIn, user: User = Depends(current_user),
               db: Session = Depends(get_db)) -> PayeeOut:
     require_org_role(db, user, org_id, EDITOR_ROLES)
@@ -115,7 +116,8 @@ def add_payee(org_id: str, body: PayeeIn, user: User = Depends(current_user),
     return payee_out(p)
 
 
-@router.put("/{org_id}/payees/{payee_id}/details", response_model=PayeeOut)
+@router.put("/{org_id}/payees/{payee_id}/details", response_model=PayeeOut,
+             dependencies=[Depends(rate_limit("payee", 20, 600))])
 def change_details(org_id: str, payee_id: str, body: DetailsIn, user: User = Depends(current_user),
                    db: Session = Depends(get_db)) -> PayeeOut:
     """A bank or UPI change is the classic fraud move, so it is recorded and raises risk on the next payments."""

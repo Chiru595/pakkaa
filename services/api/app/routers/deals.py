@@ -43,6 +43,7 @@ from app.models import (
 )
 from app.money import MAX_AMOUNT_PAISE, format_inr
 from app.rules import load_pack
+from app.schemas import bounded_text
 from app.security import audit
 from app.security.deps import current_user, membership_for, rate_limit, room_access
 
@@ -123,7 +124,7 @@ class DealOut(BaseModel):
 
 class OutcomeIn(BaseModel):
     outcome: Literal["won", "lost"]
-    note: str | None = Field(default=None, max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
+    note: bounded_text(0, 300) | None = None  # type: ignore[valid-type]
 
 
 class TermUpdate(BaseModel):
@@ -134,7 +135,7 @@ class TermUpdate(BaseModel):
 class ProfileIn(BaseModel):
     walk_away_paise: int | None = Field(default=None, gt=0, le=MAX_AMOUNT_PAISE)
     target_paise: int | None = Field(default=None, gt=0, le=MAX_AMOUNT_PAISE)
-    notes: str | None = Field(default=None, max_length=1000)
+    notes: bounded_text(0, 1000, multiline=True) | None = None  # type: ignore[valid-type]
 
 
 class ProfileOut(ProfileIn):
@@ -252,7 +253,8 @@ def get_deal(room_id: str, user: User = Depends(current_user), db: Session = Dep
     return out
 
 
-@router.patch("/{room_id}/term-sheet", response_model=DealOut)
+@router.patch("/{room_id}/term-sheet", response_model=DealOut,
+             dependencies=[Depends(rate_limit("term-edit", 60, 60))])
 def update_term(room_id: str, body: TermUpdate, user: User = Depends(current_user), db: Session = Depends(get_db),
                 settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
                 llm: LLM = Depends(get_llm_dep)) -> DealOut:
@@ -275,7 +277,8 @@ def update_term(room_id: str, body: TermUpdate, user: User = Depends(current_use
     return deal_out(db, room, member)
 
 
-@router.post("/{room_id}/proposals/{proposal_id}/{decision}", response_model=DealOut)
+@router.post("/{room_id}/proposals/{proposal_id}/{decision}", response_model=DealOut,
+             dependencies=[Depends(rate_limit("proposal", 60, 60))])
 def decide(room_id: str, proposal_id: str, decision: str, user: User = Depends(current_user),
            db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
            nexconn: NexconnClient = Depends(get_nexconn), llm: LLM = Depends(get_llm_dep)) -> DealOut:
@@ -306,7 +309,8 @@ def get_profile(room_id: str, user: User = Depends(current_user), db: Session = 
                       target_paise=p.target_paise if p else None, notes=p.notes if p else None)
 
 
-@router.put("/{room_id}/copilot/profile", response_model=ProfileOut)
+@router.put("/{room_id}/copilot/profile", response_model=ProfileOut,
+             dependencies=[Depends(rate_limit("profile", 30, 60))])
 def put_profile(room_id: str, body: ProfileIn, user: User = Depends(current_user),
                 db: Session = Depends(get_db)) -> ProfileOut:
     room, member = _context(db, user, room_id)

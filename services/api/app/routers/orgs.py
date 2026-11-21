@@ -140,7 +140,8 @@ def _chat_unavailable(exc: NexconnError) -> HTTPException:
 
 # ---------- orgs ----------
 
-@router.post("/orgs", response_model=OrgOut, status_code=201)
+@router.post("/orgs", response_model=OrgOut, status_code=201,
+             dependencies=[Depends(rate_limit("org-create", 10, 600))])
 def create_org(body: OrgCreate, user: User = Depends(current_user), db: Session = Depends(get_db)) -> OrgOut:
     org = Org(name=body.name)
     db.add(org)
@@ -159,7 +160,8 @@ def list_members(org_id: str, user: User = Depends(current_user), db: Session = 
     return [_member_out(m) for m in ms]
 
 
-@router.post("/orgs/{org_id}/members", response_model=MemberOut, status_code=201)
+@router.post("/orgs/{org_id}/members", response_model=MemberOut, status_code=201,
+             dependencies=[Depends(rate_limit("member-add", 30, 600))])
 def add_teammate(org_id: str, body: TeammateAdd, user: User = Depends(current_user),
                  db: Session = Depends(get_db)) -> MemberOut:
     require_org_role(db, user, org_id, {Role.OWNER})
@@ -198,7 +200,8 @@ def list_rooms(org_id: str, user: User = Depends(current_user), db: Session = De
     return [_room_out(db, r, user.id) for r in db.execute(q).scalars()]
 
 
-@router.post("/orgs/{org_id}/rooms", response_model=RoomOut, status_code=201)
+@router.post("/orgs/{org_id}/rooms", response_model=RoomOut, status_code=201,
+             dependencies=[Depends(rate_limit("room-create", 30, 600))])
 def new_room(org_id: str, body: RoomCreate, user: User = Depends(current_user), db: Session = Depends(get_db),
              settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> RoomOut:
     require_org_role(db, user, org_id, TEAM_ROLES)
@@ -220,7 +223,8 @@ def get_room(room_id: str, user: User = Depends(current_user), db: Session = Dep
     return _room_out(db, room, user.id, with_members=True)
 
 
-@router.post("/rooms/{room_id}/join", response_model=RoomOut)
+@router.post("/rooms/{room_id}/join", response_model=RoomOut,
+             dependencies=[Depends(rate_limit("room-join", 60, 60))])
 def join_room(room_id: str, user: User = Depends(current_user), db: Session = Depends(get_db),
               nexconn: NexconnClient = Depends(get_nexconn)) -> RoomOut:
     """Team members open any org room; joining adds them to its Nexconn group."""
@@ -240,7 +244,8 @@ def join_room(room_id: str, user: User = Depends(current_user), db: Session = De
 
 # ---------- invites ----------
 
-@router.post("/rooms/{room_id}/invites", response_model=InviteOut, status_code=201)
+@router.post("/rooms/{room_id}/invites", response_model=InviteOut, status_code=201,
+             dependencies=[Depends(rate_limit("invite-create", 30, 600))])
 def create_invite(room_id: str, body: InviteCreate, user: User = Depends(current_user),
                   db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> InviteOut:
     room, m, _ = room_access(db, user, room_id)

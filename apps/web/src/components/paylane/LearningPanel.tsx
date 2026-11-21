@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import { type MemoryEntry, PayApi, type Policy } from '../../lib/paylane'
-import { Badge, ErrorText } from '../ui'
+import { getAccessToken } from '../../lib/api'
+import { type AuditCheck, type MemoryEntry, PayApi, type Policy } from '../../lib/paylane'
+import { Badge, Button, ErrorText } from '../ui'
 
 const KIND_LABEL: Record<MemoryEntry['kind'], string> = {
   playbook: 'Deal',
@@ -19,7 +20,63 @@ function fmt(value: number, key: string): string {
   return String(value)
 }
 
-export default function LearningPanel({ orgId }: { orgId: string }) {
+function AuditBox({ orgId }: { orgId: string }) {
+  const [check, setCheck] = useState<AuditCheck | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function verify() {
+    setBusy(true)
+    setError(null)
+    try {
+      setCheck(await PayApi.verifyAudit(orgId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not verify')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function download(format: 'jsonl' | 'csv') {
+    setError(null)
+    try {
+      const res = await fetch(`/api/orgs/${orgId}/audit/export?format=${format}`, {
+        headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
+      })
+      if (!res.ok) throw new Error(`Export failed (${res.status})`)
+      const url = URL.createObjectURL(await res.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pakkaa-audit.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed')
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Audit log</h3>
+      <p className="text-sm text-slate-600">Every change is hash-chained. Exports verify on their own with scripts/verify_audit_export.py.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" busy={busy} onClick={() => void verify()}>Verify chain</Button>
+        <Button variant="ghost" onClick={() => void download('jsonl')}>Download JSONL</Button>
+        <Button variant="ghost" onClick={() => void download('csv')}>Download CSV</Button>
+      </div>
+      {check && (
+        <p className={`rounded-xl p-2 text-sm ${check.ok ? 'bg-emerald-50 text-emerald-900' : 'bg-red-50 text-red-800'}`}>
+          {check.ok
+            ? `Intact: ${check.events} events, head ${check.head_hash?.slice(0, 12)}…`
+            : `Broken at event ${check.broken_at_seq}: ${check.reason}`}
+        </p>
+      )}
+      <ErrorText>{error}</ErrorText>
+    </section>
+  )
+}
+
+export default function LearningPanel({ orgId, canAudit }: { orgId: string; canAudit: boolean }) {
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [memory, setMemory] = useState<MemoryEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +153,7 @@ export default function LearningPanel({ orgId }: { orgId: string }) {
           </ul>
         )}
       </section>
+      {canAudit && <AuditBox orgId={orgId} />}
     </div>
   )
 }

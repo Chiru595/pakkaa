@@ -138,7 +138,9 @@ class Invite(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
+    __table_args__ = (Index("ix_audit_chain_seq", "chain_key", "seq"),)
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chain_key: Mapped[str] = mapped_column(String(32))
     org_id: Mapped[str | None] = mapped_column(String(32), index=True)
     actor_user_id: Mapped[str | None] = mapped_column(String(32))
     action: Mapped[str] = mapped_column(String(60))

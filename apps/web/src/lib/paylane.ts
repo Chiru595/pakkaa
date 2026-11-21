@@ -130,6 +130,14 @@ export interface Policy {
   changes: PolicyChange[]
 }
 
+export interface AuditCheck {
+  ok: boolean
+  events: number
+  broken_at_seq: number | null
+  reason: string | null
+  head_hash: string | null
+}
+
 export interface MemoryEntry {
   id: string
   kind: 'playbook' | 'correction' | 'counterparty' | 'preference' | 'payee' | 'risk_override'
@@ -169,6 +177,7 @@ export const PayApi = {
   setThreshold: (orgId: string, key: string, value: number, reason: string) =>
     api<Policy>(`/api/orgs/${orgId}/policy/thresholds`, json('PUT', { key, value, reason })),
   memory: (orgId: string) => api<MemoryEntry[]>(`/api/orgs/${orgId}/memory`),
+  verifyAudit: (orgId: string) => api<AuditCheck>(`/api/orgs/${orgId}/audit/verify`),
   brief: (cardId: string) => api<Brief>(`/api/cards/${cardId}/brief`),
   startVerify: (cardId: string) => api<VerifyStart>(`/api/cards/${cardId}/verify-call`, post()),
   completeVerify: (cardId: string, callId: string, outcome: 'confirmed' | 'suspicious', notes: string, duration_s: number) =>

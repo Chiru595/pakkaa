@@ -38,6 +38,7 @@ from app.models import (
 )
 from app.money import MAX_AMOUNT_PAISE, format_inr
 from app.payments import PaymentProvider, get_payment_provider
+from app.schemas import ObjectId, bounded_text
 from app.security import audit
 from app.security.deps import current_user, membership_for, rate_limit, require_org_role, room_access
 
@@ -112,11 +113,11 @@ class CardOut(BaseModel):
 
 
 class CardIn(BaseModel):
-    payee_id: str = Field(min_length=1, max_length=32)
+    payee_id: ObjectId
     amount_paise: int = Field(gt=0, le=MAX_AMOUNT_PAISE)
-    reason: str = Field(min_length=2, max_length=300, pattern=r"^[^\x00-\x1f\x7f]+$")
-    deal_room_id: str | None = Field(default=None, max_length=32)
-    request_text: str | None = Field(default=None, max_length=400)
+    reason: bounded_text(2, 300)  # type: ignore[valid-type]
+    deal_room_id: ObjectId | None = None
+    request_text: bounded_text(0, 400, multiline=True) | None = None  # type: ignore[valid-type]
 
 
 class CardEdit(BaseModel):
@@ -126,7 +127,7 @@ class CardEdit(BaseModel):
 
 
 class ParseIn(BaseModel):
-    text: str = Field(min_length=3, max_length=400)
+    text: bounded_text(3, 400)  # type: ignore[valid-type]
 
 
 class ParseOut(BaseModel):
@@ -141,18 +142,18 @@ class ParseOut(BaseModel):
 
 class ApproveIn(BaseModel):
     version: int = Field(ge=1)
-    override_reason: str | None = Field(default=None, max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
+    override_reason: bounded_text(0, 300) | None = None  # type: ignore[valid-type]
 
 
 class RejectIn(BaseModel):
-    note: str = Field(default="", max_length=200, pattern=r"^[^\x00-\x1f\x7f]*$")
+    note: bounded_text(0, 200) = ""  # type: ignore[valid-type]
     suspected_fraud: bool = False
 
 
 class ThresholdIn(BaseModel):
     key: Literal["high_at", "medium_at", "baseline_multiplier", "bank_change_window_days", "no_baseline_large_rupees"]
     value: float = Field(gt=0, le=1_000_000)
-    reason: str = Field(default="", max_length=300, pattern=r"^[^\x00-\x1f\x7f]*$")
+    reason: bounded_text(0, 300) = ""  # type: ignore[valid-type]
 
 
 class BriefOut(BaseModel):
@@ -173,7 +174,7 @@ class VerifyStartOut(BaseModel):
 
 class VerifyDoneIn(BaseModel):
     outcome: Literal["confirmed", "suspicious"]
-    notes: str = Field(default="", max_length=500)
+    notes: bounded_text(0, 500, multiline=True) = ""  # type: ignore[valid-type]
     duration_s: int = Field(default=0, ge=0, le=7200)
 
 
@@ -182,7 +183,7 @@ class PayoutIn(BaseModel):
 
 
 class FreezeIn(BaseModel):
-    reason: str = Field(min_length=3, max_length=300, pattern=r"^[^\x00-\x1f\x7f]+$")
+    reason: bounded_text(3, 300)  # type: ignore[valid-type]
 
 
 class ControlOut(BaseModel):
@@ -313,7 +314,8 @@ def get_control(org_id: str, user: User = Depends(current_user), db: Session = D
     return out
 
 
-@router.post("/orgs/{org_id}/freeze", response_model=ControlOut)
+@router.post("/orgs/{org_id}/freeze", response_model=ControlOut,
+             dependencies=[Depends(rate_limit("freeze", 20, 60))])
 def freeze(org_id: str, body: FreezeIn, user: User = Depends(current_user), db: Session = Depends(get_db),
            settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> ControlOut:
     m = require_org_role(db, user, org_id, TEAM_ROLES)
@@ -326,7 +328,8 @@ def freeze(org_id: str, body: FreezeIn, user: User = Depends(current_user), db: 
     return _control_out(db, org_id, user)
 
 
-@router.post("/orgs/{org_id}/unfreeze", response_model=ControlOut)
+@router.post("/orgs/{org_id}/unfreeze", response_model=ControlOut,
+             dependencies=[Depends(rate_limit("freeze", 20, 60))])
 def unfreeze(org_id: str, user: User = Depends(current_user), db: Session = Depends(get_db),
              settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> ControlOut:
     m = require_org_role(db, user, org_id, TEAM_ROLES)
@@ -393,7 +396,8 @@ def get_card(card_id: str, user: User = Depends(current_user), db: Session = Dep
     return out
 
 
-@router.patch("/cards/{card_id}", response_model=CardOut)
+@router.patch("/cards/{card_id}", response_model=CardOut,
+             dependencies=[Depends(rate_limit("card-edit", 30, 60))])
 def edit_card(card_id: str, body: CardEdit, user: User = Depends(current_user), db: Session = Depends(get_db),
               settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
     card, m = _card(db, user, card_id)
@@ -411,7 +415,8 @@ def edit_card(card_id: str, body: CardEdit, user: User = Depends(current_user), 
     return card_out(db, card, user, m)
 
 
-@router.post("/cards/{card_id}/approve", response_model=CardOut)
+@router.post("/cards/{card_id}/approve", response_model=CardOut,
+             dependencies=[Depends(rate_limit("card-decide", 30, 60))])
 def approve_card(card_id: str, body: ApproveIn, user: User = Depends(current_user), db: Session = Depends(get_db),
                  settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn),
                  llm: LLM = Depends(get_llm_dep)) -> CardOut:
@@ -426,7 +431,8 @@ def approve_card(card_id: str, body: ApproveIn, user: User = Depends(current_use
     return card_out(db, card, user, m)
 
 
-@router.post("/cards/{card_id}/reject", response_model=CardOut)
+@router.post("/cards/{card_id}/reject", response_model=CardOut,
+             dependencies=[Depends(rate_limit("card-decide", 30, 60))])
 def reject_card(card_id: str, body: RejectIn, user: User = Depends(current_user), db: Session = Depends(get_db),
                 settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
     card, m = _card(db, user, card_id)
@@ -468,7 +474,8 @@ def brief(card_id: str, user: User = Depends(current_user), db: Session = Depend
     return BriefOut(lines=[worded.deal_line, worded.payee_line, worded.rules_line], evidence=evidence, ai_worded=ai)
 
 
-@router.post("/cards/{card_id}/verify-call", response_model=VerifyStartOut)
+@router.post("/cards/{card_id}/verify-call", response_model=VerifyStartOut,
+             dependencies=[Depends(rate_limit("verify-call", 20, 60))])
 def start_verify_call(card_id: str, user: User = Depends(current_user),
                       db: Session = Depends(get_db)) -> VerifyStartOut:
     """The approver calls the requester's verified in-app account. No phone number from the request is ever used."""
@@ -520,7 +527,8 @@ def challenge_questions(db: Session, card: PaymentCard) -> list[dict[str, str]]:
     return qs[:4]
 
 
-@router.post("/cards/{card_id}/verify-call/{call_id}/complete", response_model=CardOut)
+@router.post("/cards/{card_id}/verify-call/{call_id}/complete", response_model=CardOut,
+             dependencies=[Depends(rate_limit("verify-call", 20, 60))])
 def complete_verify_call(card_id: str, call_id: str, body: VerifyDoneIn, user: User = Depends(current_user),
                          db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
                          nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
@@ -594,7 +602,7 @@ def set_policy_threshold(org_id: str, body: ThresholdIn, user: User = Depends(cu
 
 
 class AskIn(BaseModel):
-    question: str = Field(min_length=3, max_length=300)
+    question: bounded_text(3, 300)  # type: ignore[valid-type]
 
 
 class AskOut(BaseModel):

@@ -8,7 +8,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, copilot, deals, memory, messages, orgs, payees, paylane, signing, webhooks
+from app.routers import (
+    audit_log,
+    auth,
+    copilot,
+    deals,
+    memory,
+    messages,
+    orgs,
+    payees,
+    paylane,
+    signing,
+    webhooks,
+)
 
 
 def create_app() -> FastAPI:
@@ -27,7 +39,8 @@ def create_app() -> FastAPI:
             client.close()
 
     app = FastAPI(title="Pakkaa API", version="0.1.0", lifespan=lifespan,
-                  docs_url=None if settings.is_production else "/api/docs", openapi_url="/api/openapi.json")
+                  docs_url=None if settings.is_production else "/api/docs", redoc_url=None,
+                  openapi_url=None if settings.is_production else "/api/openapi.json")
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_credentials=True,
                        allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["*"])
 
@@ -45,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(payees.router)
     app.include_router(paylane.router)
     app.include_router(memory.router)
+    app.include_router(audit_log.router)
     app.include_router(webhooks.router)
     return app
 

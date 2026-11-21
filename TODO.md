@@ -23,7 +23,8 @@ milestone must meet these rules:
 
 ## Step 0: Nexconn first
 
-- [ ] Get Nexconn docs, App Key and App Secret from the author (**blocked on author**)
+- [x] Nexconn docs read (docs.nexconn.ai): packages, init, server API signing, token endpoint, webhooks
+- [ ] App Key and App Secret in `.env` (**blocked on author**)
 - [ ] `NEXCONN_NOTES.md`: confirm or record a fallback for each of: server-side user token, rooms or groups,
       custom message types, server API to post as a bot, webhooks for new messages (and their signature
       scheme), private one-to-one channels, guest users, Call SDK for web, token lifetime, rate limits
@@ -32,7 +33,8 @@ milestone must meet these rules:
 
 ## M0 Skeleton (45 min)
 
-- [ ] Monorepo: `apps/web`, `services/api`, `docker-compose.yml` (Postgres 16 with pgvector), `.env.example`
+- [x] `.env.example` and `scripts/gen_secrets.py` (fills random secrets into `.env`)
+- [ ] Monorepo: `apps/web`, `services/api`, `docker-compose.yml` (Postgres 16 with pgvector)
 - [ ] API: FastAPI app factory, settings from env (pydantic-settings), `/healthz` and `/readyz` (DB check) (P)
 - [ ] Structured JSON logs with a request id on every line; bank and VPA values masked by a log filter (P)
 - [ ] Alembic baseline migration: Org, User, Membership, Room, AuditEvent (P)
@@ -46,12 +48,13 @@ milestone must meet these rules:
 - [ ] Strict CORS, security headers, rate limits on auth and money endpoints (P)
 - [ ] Web: Vite, React, TypeScript, Tailwind; mobile-first shell; login, org switcher, room list
 - [ ] CI: GitHub Actions running ruff, mypy, pytest, eslint, tsc and the web build (P)
-- [ ] Deploy: web on Vercel, API and Postgres on Render or Railway; migrations run on deploy (P)
+- [ ] Deploy on Vercel: web (static) and API (FastAPI as a Python function) in one project; Postgres on Neon
+      via the Vercel Marketplace; migrations run in the build step; Vercel Cron polls payment status (P)
 - **Done when:** a freelancer and a guest client chat in a Deal Room from two phones on the deployed URL.
 
 ## M1 Deal Room with live AI (2 h)
 
-- [ ] `llm.py`: one Anthropic wrapper with timeouts, retries with backoff, streaming, pydantic validation of
+- [ ] `llm.py`: one OpenAI wrapper (model per lane from env: fast, live, smart, deep) with timeouts, retries with backoff, streaming, pydantic validation of
       all JSON output, per-call token and latency logging, and a circuit breaker that degrades gracefully (P)
 - [ ] Untrusted-content wrapper: chat text goes into prompts as delimited data, never as instructions
 - [ ] Term sheet card pinned in the room; versioned

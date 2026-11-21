@@ -13,6 +13,7 @@ from app.routers import (
     auth,
     copilot,
     deals,
+    demo,
     memory,
     messages,
     orgs,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(paylane.router)
     app.include_router(memory.router)
     app.include_router(audit_log.router)
+    app.include_router(demo.router)
     app.include_router(webhooks.router)
     return app
 

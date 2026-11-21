@@ -5,4 +5,3 @@ legacy
 **/node_modules
 **/__pycache__
 services/api/tests
-services/api/migrations

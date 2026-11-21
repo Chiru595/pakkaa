@@ -5,7 +5,7 @@
   "outputDirectory": "apps/web/dist",
   "functions": {
     "api/index.py": {
-      "includeFiles": "services/api/app/**",
+      "includeFiles": "services/api/{app/**,migrations/**,alembic.ini}",
       "maxDuration": 60
     }
   },

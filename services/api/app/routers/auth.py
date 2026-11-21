@@ -70,7 +70,7 @@ SESSION_HINT_COOKIE = "pk_session"
 
 
 def _set_refresh_cookie(response: Response, token: str, settings: Settings) -> None:
-    secure = settings.api_base_url.startswith("https")
+    secure = settings.secure_cookies
     max_age = int(REFRESH_TTL.total_seconds())
     response.set_cookie(REFRESH_COOKIE, token, max_age=max_age, httponly=True, secure=secure, samesite="lax",
                         path="/api/auth")

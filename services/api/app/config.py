@@ -19,8 +19,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env", extra="ignore")
 
     app_env: str = "development"
-    web_base_url: str = "http://localhost:5173"
-    api_base_url: str = "http://localhost:8000"
+    web_base_url: str = ""
+    api_base_url: str = ""
+    vercel_project_production_url: str = ""
+    migrate_on_start: bool = False
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = False
 
@@ -56,6 +58,19 @@ class Settings(BaseSettings):
             if v.startswith(prefix):
                 return "postgresql+psycopg://" + v[len(prefix):]
         return v
+
+    @property
+    def public_url(self) -> str:
+        """Where people open the app. Vercel provides its production domain; locally it is the Vite server."""
+        if self.web_base_url:
+            return self.web_base_url.rstrip("/")
+        if self.vercel_project_production_url:
+            return f"https://{self.vercel_project_production_url}"
+        return "http://localhost:5173"
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.serverless or self.public_url.startswith("https")
 
     @property
     def is_production(self) -> bool:

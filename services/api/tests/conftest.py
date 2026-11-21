@@ -21,7 +21,7 @@ os.environ.update({
     "DATABASE_URL": TEST_DB, "DATABASE_URL_UNPOOLED": TEST_DB, "APP_ENV": "test", "DEMO_MODE": "false",
     "JWT_SECRET": "test-jwt-secret-" + "x" * 48, "OTP_PEPPER": "test-pepper", "GUEST_LINK_SECRET": "test-guest",
     "NEXCONN_APP_KEY": "testkey", "NEXCONN_APP_SECRET": "testsecret", "NEXCONN_AREA": "SG",
-    "WEB_BASE_URL": "http://web.test", "API_BASE_URL": "http://api.test",
+    "WEB_BASE_URL": "http://web.test",
 })
 
 import pytest  # noqa: E402

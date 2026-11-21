@@ -256,7 +256,7 @@ def create_invite(room_id: str, body: InviteCreate, user: User = Depends(current
     audit.record(db, "invite.create", actor_user_id=user.id, org_id=room.org_id, subject_type="room",
                  subject_id=room.id, payload={"role": body.role.value, "invite_id": inv.id})
     db.commit()
-    return InviteOut(url=f"{settings.web_base_url.rstrip('/')}/join/{token}", expires_at=inv.expires_at)
+    return InviteOut(url=f"{settings.public_url}/join/{token}", expires_at=inv.expires_at)
 
 
 def _open_invite(db: Session, settings: Settings, token: str, lock: bool = False) -> Invite:

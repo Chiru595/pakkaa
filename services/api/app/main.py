@@ -14,6 +14,10 @@ from app.routers import auth, messages, orgs, webhooks
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=logging.INFO)
+    if settings.migrate_on_start or settings.serverless:
+        from app.migrate import upgrade_to_head
+
+        upgrade_to_head(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

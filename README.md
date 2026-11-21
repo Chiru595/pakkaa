@@ -102,49 +102,49 @@ Screens from a real two-phone run of the demo script (demo mode, simulated payme
 
 | Phone OTP sign-in (test mode shows the code) | Acme Studio workspace with Ask Pakkaa |
 |---|---|
-| <img src="docs/screenshots/01-login.png" width="360"> | <img src="docs/screenshots/02-workspace.png" width="360"> |
+| <img src="docs/screenshots/01-login.png" width="200"> | <img src="docs/screenshots/02-workspace.png" width="200"> |
 
 **Deal Room: money in**
 
-<img src="docs/screenshots/03-private-heads-up.png" width="760"><br>
+<img src="docs/screenshots/03-private-heads-up.png" width="440"><br>
 *Ravi joins. Asha privately sees that he paid the last advance late; Ravi never sees it.*
 
-<img src="docs/screenshots/04-private-copilots.png" width="760"><br>
+<img src="docs/screenshots/04-private-copilots.png" width="440"><br>
 *Each side gets its own copilot with different reply options; neither sees the other's.*
 
 | Pre-send check warns below the walk-away price | Scribe turns chat into terms a person confirms |
 |---|---|
-| <img src="docs/screenshots/05-pre-send-check.png" width="360"> | <img src="docs/screenshots/06-scribe-proposals.png" width="360"> |
+| <img src="docs/screenshots/05-pre-send-check.png" width="200"> | <img src="docs/screenshots/06-scribe-proposals.png" width="200"> |
 
-<img src="docs/screenshots/07-term-sheet-fair-price.png" width="360"><br>
+<img src="docs/screenshots/07-term-sheet-fair-price.png" width="200"><br>
 *Term sheet with the fair-price meter and the checks to finish before locking.*
 
-<img src="docs/screenshots/08-otp-sign-and-lock.png" width="760"><br>
+<img src="docs/screenshots/08-otp-sign-and-lock.png" width="440"><br>
 *Both sides sign the exact version with an OTP; the sheet locks with its SHA-256.*
 
-<img src="docs/screenshots/09-advance-paid.png" width="760"><br>
+<img src="docs/screenshots/09-advance-paid.png" width="440"><br>
 *Ravi pays the advance through the (simulated) payment link; the room shows it received.*
 
 **Pay Lane: money out**
 
-<img src="docs/screenshots/10-impostor-blocked.png" width="760"><br>
+<img src="docs/screenshots/10-impostor-blocked.png" width="440"><br>
 *An impostor using the owner's name asks for money in chat: it becomes an unverified draft at risk 100.*
 
 | Step-up check: the requester confirms the exact card with an OTP | Approver brief, risk rules and the step-up result |
 |---|---|
-| <img src="docs/screenshots/11-step-up-check.png" width="360"> | <img src="docs/screenshots/12-approver-brief.png" width="360"> |
+| <img src="docs/screenshots/11-step-up-check.png" width="200"> | <img src="docs/screenshots/12-approver-brief.png" width="200"> |
 
-<img src="docs/screenshots/13-two-approvals-paid.png" width="360"><br>
+<img src="docs/screenshots/13-two-approvals-paid.png" width="200"><br>
 *Two approvals, then a one-time (simulated) payout.*
 
-<img src="docs/screenshots/14-kill-switch.png" width="760"><br>
+<img src="docs/screenshots/14-kill-switch.png" width="440"><br>
 *Anyone can freeze all payments; unfreezing needs two different approvers.*
 
 **Answers and learning**
 
 | Ask Pakkaa answers from the workspace's own records | What Pakkaa learned, and the audit chain verified |
 |---|---|
-| <img src="docs/screenshots/15-ask-pakkaa.png" width="360"> | <img src="docs/screenshots/16-learning-and-audit.png" width="360"> |
+| <img src="docs/screenshots/15-ask-pakkaa.png" width="200"> | <img src="docs/screenshots/16-learning-and-audit.png" width="200"> |
 
 ## All features
 
@@ -205,7 +205,8 @@ vercel.json     Vercel Services: web (Vite) and api (FastAPI, Singapore region)
 - Models: `gpt-6-luna` for fast checks, `gpt-6.1-terra` for live copilot replies, `gpt-6.2-sol` for extraction,
   briefs and explanations, `gpt-6.2-astra` for slow high-stakes work, `text-embedding-3-small` for memory.
 
-See [NEXCONN_NOTES.md](NEXCONN_NOTES.md) for how Nexconn is used and [TODO.md](TODO.md) for progress.
+See [docs/TECHNICAL.md](docs/TECHNICAL.md) for the tech stack per feature and how each part works,
+[NEXCONN_NOTES.md](NEXCONN_NOTES.md) for how Nexconn is used, and [TODO.md](TODO.md) for progress.
 
 ## Run the 3-minute demo
 

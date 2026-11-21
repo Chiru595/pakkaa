@@ -288,7 +288,7 @@ After a restart, run `scripts\dev_db.py` again (if you use the embedded database
 Wipe all data (schema kept) and rebuild only the seeded Acme Studio workspace:
 
 ```powershell
-.\servicespi\.venv\Scripts\python scriptseset_data.py --confirm wipe
+.\services\api\.venv\Scripts\python scripts\reset_data.py --confirm wipe
 ```
 
 For a hosted database, pass its env files and `--allow-remote` (see the script's docstring).

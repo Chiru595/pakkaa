@@ -38,7 +38,9 @@ def require_participant(member: RoomMember | None) -> RoomMember:
 
 def get_sheet(db: Session, room: Room, *, lock: bool = False) -> TermSheet:
     q = select(TermSheet).where(TermSheet.room_id == room.id)
-    sheet = db.execute(q.with_for_update() if lock else q).scalar_one_or_none()
+    if lock:
+        q = q.with_for_update().execution_options(populate_existing=True)
+    sheet = db.execute(q).scalar_one_or_none()
     if sheet is None:
         sheet = TermSheet(room_id=room.id, version=1, terms={}, category=detect_category(room.title))
         db.add(sheet)

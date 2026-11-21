@@ -270,7 +270,7 @@ class PaymentLink(Base):
     status: Mapped[str] = mapped_column(String(10), default=PaymentStatus.PENDING)
     provider: Mapped[str] = mapped_column(String(20), default="simulated")
     provider_ref: Mapped[str] = mapped_column(String(64), unique=True)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    public_token: Mapped[str] = mapped_column(String(64), unique=True)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     paid_at: Mapped[datetime | None]

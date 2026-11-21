@@ -196,7 +196,8 @@ def deal_out(db: Session, room: Room, member: RoomMember) -> DealOut:
                                confidence_pct=p.confidence_pct,
                                source_message_id=(_message_ref(db, [p.source_message_id]) or [None])[0]
                                if p.source_message_id else None) for p in pending],
-        advance_link=link_out(link) if link else None, disclaimer=DISCLAIMER)
+        advance_link=link_out(link, f"{get_settings().public_url}/pay/{link.public_token}") if link else None,
+        disclaimer=DISCLAIMER)
 
 
 @router.get("/{room_id}/deal", response_model=DealOut)

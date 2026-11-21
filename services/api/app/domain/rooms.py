@@ -9,8 +9,18 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.db import new_id
-from app.integrations.nexconn import NexconnClient, NexconnError
-from app.models import TEAM_ROLES, Membership, Room, RoomMember, RoomSide, RoomType, User
+from app.integrations.nexconn import TEXT_MESSAGE_TYPE, NexconnClient, NexconnError
+from app.models import (
+    TEAM_ROLES,
+    ChatMessage,
+    Membership,
+    MessageKind,
+    Room,
+    RoomMember,
+    RoomSide,
+    RoomType,
+    User,
+)
 from app.security import audit
 
 log = logging.getLogger(__name__)
@@ -54,12 +64,34 @@ def add_member(db: Session, nexconn: NexconnClient, room: Room, user: User, side
     return rm
 
 
-def post_system_card(nexconn: NexconnClient, settings: Settings, room: Room, card: dict[str, Any]) -> None:
-    """Best effort: a failed notice never rolls back the state change it describes."""
+def post_card(db: Session, nexconn: NexconnClient, settings: Settings, room: Room, card: dict[str, Any],
+              to_user_ids: list[str] | None = None) -> ChatMessage | None:
+    """Posts a bot card and records it. Best effort: a failed notice never rolls back the change it describes."""
     try:
-        nexconn.send_card(settings.nexconn_bot_user_id, room.nexconn_channel_id, card)
+        message_id = nexconn.send_card(settings.nexconn_bot_user_id, room.nexconn_channel_id, card,
+                                       to_user_ids=to_user_ids)
     except NexconnError:
-        log.exception("could not post system card", extra={"room_id": room.id})
+        log.exception("could not post card", extra={"room_id": room.id})
+        return None
+    if to_user_ids:
+        return None
+    msg = ChatMessage(room_id=room.id, nexconn_message_id=message_id, sender_user_id=None,
+                      sender_chat_id=settings.nexconn_bot_user_id, kind=MessageKind.CARD,
+                      body=str(card.get("title") or ""), card=card)
+    db.add(msg)
+    db.commit()
+    return msg
 
 
-__all__ = ["NexconnError", "add_member", "create_room", "post_system_card"]
+def send_text(db: Session, nexconn: NexconnClient, room: Room, sender: User, text: str) -> ChatMessage:
+    message_id = nexconn.send_group_message(sender.chat_id, room.nexconn_channel_id, TEXT_MESSAGE_TYPE,
+                                            {"content": text}, push_content=f"{sender.name}: {text[:60]}",
+                                            echo_to_sender=True)
+    msg = ChatMessage(room_id=room.id, nexconn_message_id=message_id, sender_user_id=sender.id,
+                      sender_chat_id=sender.chat_id, kind=MessageKind.TEXT, body=text)
+    db.add(msg)
+    db.commit()
+    return msg
+
+
+__all__ = ["NexconnError", "add_member", "create_room", "post_card", "send_text"]

@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from sqlalchemy import select, update
 
-from app.models import OtpChallenge
+from app.models import AuthSession, OtpChallenge
 from app.security.otp import OTP_MAX_ATTEMPTS
 
 PHONE = "9876543210"
@@ -14,7 +14,7 @@ def _request(client):
 
 
 def test_signup_requires_consent_and_name_then_logs_in(client, sent_codes):
-    assert _request(client).json() == {"phone": E164, "is_new_user": True, "test_mode": True,
+    assert _request(client).json() == {"phone": E164, "is_new_user": True, "needs_consent": True, "test_mode": True,
                                        "test_code": sent_codes[E164]}
     r = client.post("/api/auth/otp/verify", json={"phone": PHONE, "code": sent_codes[E164], "name": "Asha"})
     assert r.status_code == 400 and "privacy" in r.json()["detail"]
@@ -66,13 +66,26 @@ def test_expired_code_rejected(client, sent_codes, db):
     assert r.status_code == 400 and "expired" in r.json()["detail"]
 
 
-def test_refresh_rotates_and_reuse_signs_out_family(client, login_as):
+def test_concurrent_refresh_within_grace_is_allowed(client, login_as):
+    login_as(PHONE)
+    old_cookie = client.cookies.get("pk_refresh")
+    assert client.post("/api/auth/refresh").status_code == 200
+    client.cookies.set("pk_refresh", old_cookie, path="/api/auth")
+    r = client.post("/api/auth/refresh")
+    assert r.status_code == 200
+    assert client.get("/api/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"}).status_code == 200
+
+
+def test_refresh_rotates_and_reuse_signs_out_family(client, login_as, db):
     s = login_as(PHONE)
     old_cookie = client.cookies.get("pk_refresh")
     r = client.post("/api/auth/refresh")
     assert r.status_code == 200
     new_access = r.json()["access_token"]
     assert client.cookies.get("pk_refresh") != old_cookie
+    db.execute(update(AuthSession).where(AuthSession.replaced_by.is_not(None))
+               .values(revoked_at=AuthSession.revoked_at - timedelta(seconds=30)))
+    db.commit()
     client.cookies.set("pk_refresh", old_cookie, path="/api/auth")
     assert client.post("/api/auth/refresh").status_code == 401
     assert client.get("/api/me", headers={"Authorization": f"Bearer {new_access}"}).status_code == 401

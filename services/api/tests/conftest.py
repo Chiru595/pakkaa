@@ -59,13 +59,17 @@ class FakeNexconn:
     def leave_group(self, channel_id, user_ids):
         self._log("leave_group", channel_id, list(user_ids))
 
+    def _next_id(self) -> str:
+        self.counter = getattr(self, "counter", 0) + 1
+        return f"msg{self.counter}"
+
     def send_card(self, from_user_id, channel_id, card, to_user_ids=None):
         self._log("send_card", from_user_id, channel_id, card, to_user_ids=to_user_ids)
-        return "m1"
+        return self._next_id()
 
     def send_group_message(self, *args, **kwargs):
         self._log("send_group_message", *args, **kwargs)
-        return "m2"
+        return self._next_id()
 
     def close(self):
         pass
@@ -88,8 +92,8 @@ def migrated_db():
 def clean_tables():
     reset_rate_limits()
     with get_engine().begin() as conn:
-        conn.execute(text("TRUNCATE audit_events, invites, room_members, rooms, auth_sessions, memberships, "
-                          "otp_challenges, users, orgs RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE chat_messages, audit_events, invites, room_members, rooms, auth_sessions, "
+                          "memberships, otp_challenges, users, orgs RESTART IDENTITY CASCADE"))
     yield
 
 

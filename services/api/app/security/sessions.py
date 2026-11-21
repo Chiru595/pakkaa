@@ -17,6 +17,7 @@ ACCESS_TTL = timedelta(minutes=15)
 REFRESH_TTL = timedelta(days=14)
 ISSUER = "pakkaa"
 REFRESH_COOKIE = "pk_refresh"
+REUSE_GRACE = timedelta(seconds=10)
 
 
 class SessionError(Exception):
@@ -64,7 +65,8 @@ def rotate(db: Session, refresh_token: str, secret: str, user_agent: str | None)
     now = utcnow()
     if s is None:
         raise SessionError("unknown session")
-    if s.revoked_at is not None or s.replaced_by is not None:
+    in_grace = s.replaced_by is not None and s.revoked_at is not None and now - s.revoked_at <= REUSE_GRACE
+    if (s.revoked_at is not None or s.replaced_by is not None) and not in_grace:
         db.execute(update(AuthSession).where(AuthSession.family_id == s.family_id, AuthSession.revoked_at.is_(None))
                    .values(revoked_at=now))
         db.commit()
@@ -72,8 +74,9 @@ def rotate(db: Session, refresh_token: str, secret: str, user_agent: str | None)
     if s.expires_at < now:
         raise SessionError("session expired")
     issued = start_session(db, s.user_id, secret, user_agent, family_id=s.family_id)
-    s.replaced_by = issued.session_id
-    s.revoked_at = now
+    if not in_grace:
+        s.replaced_by = issued.session_id
+        s.revoked_at = now
     return s.user_id, issued
 
 

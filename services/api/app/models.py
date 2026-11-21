@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import BigInteger, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -146,4 +146,25 @@ class AuditEvent(Base):
     payload_hash: Mapped[str] = mapped_column(String(64))
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class MessageKind(StrEnum):
+    TEXT = "text"
+    CARD = "card"
+
+
+class ChatMessage(Base):
+    """Our record of every room message; Nexconn delivers it live, this table is the source of truth."""
+
+    __tablename__ = "chat_messages"
+    __table_args__ = (Index("ix_chat_messages_room_created", "room_id", "created_at"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"))
+    nexconn_message_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    sender_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    sender_chat_id: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(10))
+    body: Mapped[str] = mapped_column(Text, default="")
+    card: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

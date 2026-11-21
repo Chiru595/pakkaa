@@ -27,6 +27,7 @@ class OtpRequest(BaseModel):
 class OtpRequested(BaseModel):
     phone: str
     is_new_user: bool
+    needs_consent: bool
     test_mode: bool
     test_code: str | None = None
 
@@ -80,9 +81,10 @@ def otp_request(body: OtpRequest, db: Session = Depends(get_db),
         issued = request_otp(db, phone, settings.otp_pepper, otp_provider)
     except OtpError as exc:
         raise _otp_error(exc) from exc
-    exists = db.execute(select(User.id).where(User.phone_e164 == phone)).first() is not None
+    existing = db.execute(select(User).where(User.phone_e164 == phone)).scalar_one_or_none()
     test_mode = settings.demo_mode or not settings.is_production
-    return OtpRequested(phone=phone, is_new_user=not exists, test_mode=test_mode,
+    return OtpRequested(phone=phone, is_new_user=existing is None,
+                        needs_consent=existing is None or existing.consented_at is None, test_mode=test_mode,
                         test_code=issued.code if test_mode else None)
 
 

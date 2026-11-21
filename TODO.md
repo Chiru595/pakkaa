@@ -36,19 +36,21 @@ milestone must meet these rules:
 ## M0 Skeleton (45 min)
 
 - [x] `.env.example` and `scripts/gen_secrets.py` (fills random secrets into `.env`)
-- [ ] Monorepo: `apps/web`, `services/api`, `docker-compose.yml` (Postgres 16 with pgvector)
+- [x] Monorepo: `apps/web`, `services/api`, `docker-compose.yml`; `scripts/dev_db.py` runs embedded Postgres 16 +
+      pgvector when Docker image pulls are blocked
 - [ ] API: FastAPI app factory, settings from env (pydantic-settings), `/healthz` and `/readyz` (DB check) (P)
 - [ ] Structured JSON logs with a request id on every line; bank and VPA values masked by a log filter (P)
-- [ ] Alembic baseline migration: Org, User, Membership, Room, AuditEvent (P)
-- [ ] OTP login: `OtpProvider` interface, dev mock prints codes to the server log; OTP hashed at rest,
+- [x] Alembic baseline migration: Org, User, Membership, Room, AuditEvent (P)
+- [x] OTP login: `OtpProvider` interface, dev mock prints codes to the server log; OTP hashed at rest,
       5-minute expiry, 5 attempts then lockout, resend cooldown (P)
-- [ ] Session: short-lived access JWT plus rotating refresh token in an httpOnly, Secure, SameSite cookie (P)
-- [ ] DPDP consent notice at signup; consent version and time stored on the user (P)
-- [ ] Orgs, memberships, roles (owner, finance, member, client_guest, vendor_guest)
-- [ ] Nexconn token endpoint (short-lived, per user); create Deal Room and Pay Lane rooms
-- [ ] Guest join by signed, expiring, single-use link (P)
+- [x] Session: short-lived access JWT plus rotating refresh token in an httpOnly, Secure, SameSite cookie (P)
+- [x] DPDP consent notice at signup; consent version and time stored on the user (P)
+- [x] Orgs, memberships, roles (owner, finance, member, client_guest, vendor_guest)
+- [x] Nexconn token endpoint; create Deal Room and Pay Lane rooms; messages routed through the API
+- [x] Guest join by signed, expiring, single-use link (P)
 - [ ] Strict CORS, security headers, rate limits on auth and money endpoints (P)
-- [ ] Web: Vite, React, TypeScript, Tailwind; mobile-first shell; login, org switcher, room list
+- [x] Web: Vite, React, TypeScript, Tailwind; mobile-first shell; login, workspace setup, room list, room chat,
+      people sheet with verified badges, invite links, join page, privacy notice
 - [ ] CI: GitHub Actions running ruff, mypy, pytest, eslint, tsc and the web build (P)
 - [ ] Deploy on Vercel: web (static) and API (FastAPI as a Python function) in one project; Postgres on Neon
       via the Vercel Marketplace; migrations run in the build step (P)

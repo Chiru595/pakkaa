@@ -127,6 +127,7 @@ class NexconnClient:
         to_user_ids: Sequence[str] | None = None,
         push_content: str | None = None,
         persist: bool = True,
+        echo_to_sender: bool = False,
     ) -> str | None:
         """Posts to a group as `from_user_id`. `to_user_ids` makes it visible only to those members."""
         body: dict[str, Any] = {
@@ -135,6 +136,7 @@ class NexconnClient:
             "messageType": message_type,
             "content": content if isinstance(content, str) else json.dumps(content, ensure_ascii=False),
             "shouldPersist": 1 if persist else 0,
+            "isEchoToSender": 1 if echo_to_sender else 0,
         }
         if to_user_ids:
             body["toUserIds"] = list(to_user_ids)

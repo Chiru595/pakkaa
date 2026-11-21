@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import get_db, utcnow
 from app.deps import get_nexconn
-from app.domain.rooms import NexconnError, add_member, create_room, post_system_card
+from app.domain.rooms import NexconnError, add_member, create_room, post_card
 from app.integrations.nexconn import NexconnClient
 from app.models import (
     GUEST_ROLES,
@@ -209,7 +209,7 @@ def new_room(org_id: str, body: RoomCreate, user: User = Depends(current_user), 
         raise _chat_unavailable(exc) from exc
     db.commit()
     kind = "Deal Room" if body.type is RoomType.DEAL else "Pay Lane"
-    post_system_card(nexconn, settings, room, {"kind": "system", "v": 1, "title": f"{kind} created by {user.name}"})
+    post_card(db, nexconn, settings, room, {"kind": "system", "v": 1, "title": f"{kind} created by {user.name}"})
     return _room_out(db, room, user.id, with_members=True)
 
 
@@ -302,7 +302,7 @@ def accept_invite(token: str, user: User = Depends(current_user), db: Session = 
     db.commit()
     label = "client" if side is RoomSide.CLIENT else "vendor"
     title = f"{user.name} joined as {label} (verified phone ••{user.phone_last4})"
-    post_system_card(nexconn, settings, room, {"kind": "system", "v": 1, "title": title})
+    post_card(db, nexconn, settings, room, {"kind": "system", "v": 1, "title": title})
     return _room_out(db, room, user.id, with_members=True)
 
 

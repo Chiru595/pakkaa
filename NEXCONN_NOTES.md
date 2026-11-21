@@ -39,6 +39,15 @@ the docs page says `isPersited`), then `NCEngine.connect({ token })`. Calls: `NC
 | Call SDK (web) | **from docs** | One-to-one call to the approver's in-app user id. Captions: browser Web Speech API, else `gpt-transcribe` |
 | Domain allowlist | **to verify** | Not in the docs read. Check the console when deploying |
 
+## Message routing (decision, 21 Nov)
+
+Group history from `createMessagesQuery` returned messages sent through the server API but not text messages
+that web clients sent with `channel.sendMessage` (verified with two browsers; not explained in the docs).
+So every room message goes through our API: `POST /api/rooms/{id}/messages` checks room membership, posts via
+`/v4/group-channel/message/send` as the user (`fromUserId` = their chat id, `isEchoToSender=1`) and stores the
+message in `chat_messages`. Nexconn delivers it live to every member; history is served from our database.
+This also gives the Scribe, the money-talk detector and the audit log one trusted stream without webhooks.
+
 ## Console settings to turn on
 
 - Chat > Chat settings > Webhooks: URL `https://<deployed-host>/api/webhooks/nexconn`, event `message:send`.

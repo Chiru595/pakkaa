@@ -24,3 +24,6 @@ Thumbs.db
 # prior work, kept locally for porting
 legacy/
 .pgdata/
+
+.vercel
+.env*

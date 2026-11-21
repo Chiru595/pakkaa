@@ -282,3 +282,24 @@ def test_audit_chain_holds_after_paylane_flow(client, team, db):
     db.execute(text("UPDATE audit_events SET payload = '{}'::jsonb WHERE action = 'card.paid'"))
     db.commit()
     assert not audit.verify_chain(db).ok
+
+
+def test_ask_pakkaa_answers_from_org_records_only(client, team, llm, login_as):
+    url = f"/api/orgs/{team['org']}/ask"
+    h = team["finance"]["headers"]
+    client.post(f"/api/orgs/{team['org']}/payees", json={"name": "Print Co", "method": "upi", "vpa": "print@okhdfc",
+                                                         "gstin": "27AAPFU0939F1ZV"}, headers=h)
+    llm.available = False
+    r = client.post(url, json={"question": "Have we paid GSTIN 27AAPFU0939F1ZV before?"}, headers=h).json()
+    assert "never been paid" in r["answer"] and not r["ai_worded"]
+    r = client.post(url, json={"question": "Have we paid 29ABCDE1234F1Z9?"}, headers=h).json()
+    assert "not a valid GSTIN" in r["answer"]
+    llm.available = True
+    llm.queue("ask", {"answer": "Print Co was paid ₹99,999 [F1].", "cited": ["F1"]})
+    r = client.post(url, json={"question": "Did we pay Print Co?"}, headers=h).json()
+    assert not r["ai_worded"] and "₹99,999" not in r["answer"]
+    llm.queue("ask", {"answer": "Print Co has never been paid [F1].", "cited": ["F1"]})
+    r = client.post(url, json={"question": "Did we pay Print Co?"}, headers=h).json()
+    assert r["ai_worded"] and r["answer"] == "Print Co has never been paid [F1]."
+    other = login_as(OUTSIDER, "Bob")
+    assert client.post(url, json={"question": "Did we pay Print Co?"}, headers=other["headers"]).status_code == 404

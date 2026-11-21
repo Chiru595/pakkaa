@@ -550,3 +550,28 @@ def get_policy(org_id: str, user: User = Depends(current_user), db: Session = De
     pack = policy()
     return {"approval_bands": pack["approval_bands"], "approver_roles": pack["approver_roles"],
             "source": pack["source"], "as_of": pack["as_of"], "disclaimer": pack["disclaimer"]}
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=3, max_length=300)
+
+
+class AskOut(BaseModel):
+    answer: str
+    facts: list[dict[str, str | None]]
+    ai_worded: bool
+    disclaimer: str = "Answers come only from your workspace's own records."
+
+
+@router.post("/orgs/{org_id}/ask", response_model=AskOut, dependencies=[Depends(rate_limit("ask", 20, 60))])
+def ask(org_id: str, body: AskIn, user: User = Depends(current_user), db: Session = Depends(get_db),
+        llm: LLM = Depends(get_llm_dep)) -> AskOut:
+    from app.agents import ask as A
+
+    require_org_role(db, user, org_id, TEAM_ROLES)
+    result = A.answer(db, llm, org_id, " ".join(body.question.split()))
+    audit.record(db, "ask.query", actor_user_id=user.id, org_id=org_id, subject_type="org", subject_id=org_id,
+                 payload={"chars": len(body.question), "ai": result.ai_worded})
+    db.commit()
+    return AskOut(answer=result.text, facts=[{"id": f.id, "text": f.text, "link": f.link} for f in result.facts],
+                  ai_worded=result.ai_worded)

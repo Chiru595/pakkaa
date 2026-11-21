@@ -91,6 +91,8 @@ def assess(db: Session, *, org_id: str, card_id: str | None, payee_id: str | Non
         requester = db.get(User, requester_id)
         if requester is not None:
             clashes = name_collisions(db, org_id, requester_id, requester.name)
+            if requester_role in ("owner", "finance", "member"):
+                clashes = [c for c in clashes if c["role"] in ("owner", "finance", "member")]
             if clashes:
                 signals.append(Signal("name_collision", 40,
                                       f"Requester's name matches {clashes[0]['name']} ({clashes[0]['role']}), a "

@@ -139,7 +139,9 @@ def risk_override(db: Session, llm: LLM | None, card: PaymentCard, actor: User, 
 def counterparty_notes(db: Session, org_id: str, client_ids: list[str]) -> list[str]:
     from app.memory.store import counterparty_items
 
-    return [m.text for m in counterparty_items(db, org_id, client_ids)]
+    items = counterparty_items(db, org_id, client_ids)
+    late_first = sorted(items, key=lambda m: (-(m.data or {}).get("days_late", 0), -m.created_at.timestamp()))
+    return [m.text for m in late_first]
 
 
 __all__ = ["ADVANCE_GRACE_DAYS", "MemoryVisibility", "advance_paid", "counterparty_notes", "deal_outcome",

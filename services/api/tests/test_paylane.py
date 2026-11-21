@@ -317,3 +317,12 @@ def test_urgency_in_typed_request_counts_even_if_reason_is_clean(client, team):
     card = new_card(client, team, amount=500_000, reason="final files",
                     request_text="pay Ravi 5k urgently for final files, need it immediately")
     assert {"urgency"} <= {s["rule_id"] for s in card["signals"]}
+
+
+def test_guest_copying_a_name_does_not_raise_the_real_members_risk(client, team, login_as):
+    invite = client.post(f"/api/rooms/{team['lane']['id']}/invites", json={"role": "vendor_guest"},
+                         headers=team["owner"]["headers"]).json()
+    copycat = login_as(VENDOR, "Mo")
+    client.post(f"/api/invites/{invite['url'].rsplit('/', 1)[1]}/accept", headers=copycat["headers"])
+    card = new_card(client, team, who="member")
+    assert "name_collision" not in {s["rule_id"] for s in card["signals"]}

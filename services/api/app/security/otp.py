@@ -23,6 +23,7 @@ OTP_TTL = timedelta(minutes=5)
 OTP_MAX_ATTEMPTS = 5
 RESEND_COOLDOWN = timedelta(seconds=30)
 MAX_PER_HOUR = 6
+TEST_MODE_MAX_PER_HOUR = 60
 
 
 class OtpError(Exception):
@@ -76,7 +77,7 @@ class IssuedOtp:
 
 
 def request_otp(db: Session, phone_e164: str, pepper: str, provider: OtpProvider,
-                purpose: str = "login") -> IssuedOtp:
+                purpose: str = "login", *, max_per_hour: int = MAX_PER_HOUR) -> IssuedOtp:
     """`purpose` scopes a code to one action (login, or signing one term-sheet version) so codes never cross over."""
     now = utcnow()
     recent = db.execute(
@@ -87,7 +88,7 @@ def request_otp(db: Session, phone_e164: str, pepper: str, provider: OtpProvider
     count, latest = recent
     if latest and now - latest < RESEND_COOLDOWN:
         raise OtpError("Please wait a few seconds before asking for another code", 429)
-    if count >= MAX_PER_HOUR:
+    if count >= max_per_hour:
         raise OtpError("Too many codes requested. Try again in an hour", 429)
     code = f"{secrets.randbelow(1_000_000):06d}"
     db.add(OtpChallenge(phone_e164=phone_e164, purpose=purpose, code_hash=_hash(pepper, phone_e164, code, purpose),

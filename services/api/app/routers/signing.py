@@ -35,7 +35,7 @@ from app.routers.deals import DealOut, PaymentLinkOut, deal_out, link_out
 from app.schemas import OtpCode
 from app.security import audit
 from app.security.deps import current_user, rate_limit, room_access
-from app.security.otp import OtpError, request_otp, verify_otp
+from app.security.otp import MAX_PER_HOUR, TEST_MODE_MAX_PER_HOUR, OtpError, request_otp, verify_otp
 
 router = APIRouter(prefix="/api", tags=["signing"])
 
@@ -80,7 +80,7 @@ def _check_target(sheet: TermSheet, body: SignTarget) -> None:
 
 
 @router.post("/rooms/{room_id}/term-sheet/sign/request", response_model=SignRequestOut,
-             dependencies=[Depends(rate_limit("sign-otp", 10, 600))])
+             dependencies=[Depends(rate_limit("sign-otp", 30, 600))])
 def request_signature(room_id: str, body: SignTarget, user: User = Depends(current_user),
                       db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> SignRequestOut:
     room, _, member = room_access(db, user, room_id)
@@ -93,11 +93,12 @@ def request_signature(room_id: str, body: SignTarget, user: User = Depends(curre
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Agree these first: {'; '.join(missing)}")
     if any(s.user_id == user.id for s in signatures(db, sheet)):
         raise HTTPException(status.HTTP_409_CONFLICT, "You already signed this version")
+    test_mode = settings.demo_mode or not settings.is_production
     try:
-        issued = request_otp(db, user.phone_e164, settings.otp_pepper, otp_provider, _purpose(sheet.id, sheet.version))
+        issued = request_otp(db, user.phone_e164, settings.otp_pepper, otp_provider, _purpose(sheet.id, sheet.version),
+                             max_per_hour=TEST_MODE_MAX_PER_HOUR if test_mode else MAX_PER_HOUR)
     except OtpError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
-    test_mode = settings.demo_mode or not settings.is_production
     return SignRequestOut(version=sheet.version, hash=current_hash(sheet), phone_last4=user.phone_last4,
                           test_mode=test_mode, test_code=issued.code if test_mode else None)
 

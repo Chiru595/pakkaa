@@ -88,7 +88,7 @@ def match_deals(db: Session, org_id: str, text: str) -> list[tuple[Room, str]]:
         if score:
             price = T.values(sheet.terms).get("price_paise") if sheet else None
             out.append((score, room, T.display("price_paise", price) if price else ""))
-    out.sort(key=lambda x: -x[0])
+    out.sort(key=lambda x: (-x[0], -x[1].created_at.timestamp()))
     return [(r, p) for _, r, p in out[:3]]
 
 

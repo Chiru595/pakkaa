@@ -242,16 +242,27 @@ function AdvanceBox({ deal, roomId, onChange }: { deal: Deal; roomId: string; on
   )
 }
 
-export function CounterpartyNotes({ notes }: { notes: string[] }) {
+export function CounterpartyNotes({ notes, compact = false }: { notes: string[]; compact?: boolean }) {
+  const [expanded, setExpanded] = useState(false)
   if (!notes.length) return null
+  const shown = compact && !expanded ? notes.slice(0, 1) : notes
   return (
-    <section className="rounded-2xl border border-amber-300 bg-amber-50 p-3" aria-label="What your team remembers">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-800">From your history · only your side sees this</h3>
-      <ul className="mt-1.5 space-y-1 text-sm text-amber-950">
-        {notes.map((n) => (
-          <li key={n}>• {n}</li>
+    <section className="rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2" aria-label="What your team remembers">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+        🔒 From your history · only your side sees this
+      </h3>
+      <ul className="mt-1 space-y-1 text-sm text-amber-950">
+        {shown.map((n) => (
+          <li key={n} className={compact && !expanded ? 'line-clamp-2' : ''}>
+            {n}
+          </li>
         ))}
       </ul>
+      {compact && notes.length > 1 && (
+        <button type="button" onClick={() => setExpanded((e) => !e)} className="mt-1 text-xs font-medium text-amber-800 underline">
+          {expanded ? 'Show less' : `+${notes.length - 1} more`}
+        </button>
+      )}
     </section>
   )
 }

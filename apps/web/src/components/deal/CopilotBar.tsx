@@ -18,14 +18,19 @@ function LimitsForm({ roomId, side, onClose }: { roomId: string; side: string; o
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
+    let alive = true
     DealApi.profile(roomId)
       .then((p) => {
+        if (!alive) return
         setProfile(p)
         setWalkAway(p.walk_away_paise ? String(p.walk_away_paise / 100) : '')
         setTarget(p.target_paise ? String(p.target_paise / 100) : '')
         setNotes(p.notes ?? '')
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
+      .catch((e) => alive && setError(e instanceof Error ? e.message : 'Could not load'))
+    return () => {
+      alive = false
+    }
   }, [roomId])
 
   async function save(e: FormEvent) {

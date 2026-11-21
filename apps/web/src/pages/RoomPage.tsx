@@ -287,7 +287,7 @@ export default function RoomPage() {
         {isDeal && deal && <DealBar deal={deal} onOpen={() => setShowSheet(true)} />}
         {isDeal && deal && deal.counterparty_notes.length > 0 && (
           <div className="border-b border-amber-200 px-3 py-2">
-            <CounterpartyNotes notes={deal.counterparty_notes.slice(0, 2)} />
+            <CounterpartyNotes notes={deal.counterparty_notes} compact />
           </div>
         )}
         {isTeamLane && (

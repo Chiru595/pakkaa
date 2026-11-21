@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
+import DemoGuide from './components/DemoGuide'
 import { Screen, Spinner } from './components/ui'
 import { AuthProvider, useAuth } from './lib/auth'
 import Home from './pages/Home'
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/" element={<Gate><Home /></Gate>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <DemoGuide />
       </BrowserRouter>
     </AuthProvider>
   )

@@ -12,7 +12,15 @@ from app.models import Membership, User
 from app.schemas import OtpCode, PersonName, PhoneInput
 from app.security import audit
 from app.security.deps import current_user, rate_limit
-from app.security.otp import LogOtpProvider, OtpError, normalize_phone, request_otp, verify_otp
+from app.security.otp import (
+    MAX_PER_HOUR,
+    TEST_MODE_MAX_PER_HOUR,
+    LogOtpProvider,
+    OtpError,
+    normalize_phone,
+    request_otp,
+    verify_otp,
+)
 from app.security.sessions import REFRESH_COOKIE, REFRESH_TTL, SessionError, revoke, rotate, start_session
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -87,22 +95,23 @@ def _otp_error(exc: OtpError) -> HTTPException:
     return HTTPException(exc.status, str(exc))
 
 
-@router.post("/otp/request", response_model=OtpRequested, dependencies=[Depends(rate_limit("otp", 10, 600))])
+@router.post("/otp/request", response_model=OtpRequested, dependencies=[Depends(rate_limit("otp", 30, 600))])
 def otp_request(body: OtpRequest, db: Session = Depends(get_db),
                 settings: Settings = Depends(get_settings)) -> OtpRequested:
+    test_mode = settings.demo_mode or not settings.is_production
     try:
         phone = normalize_phone(body.phone)
-        issued = request_otp(db, phone, settings.otp_pepper, otp_provider)
+        issued = request_otp(db, phone, settings.otp_pepper, otp_provider,
+                             max_per_hour=TEST_MODE_MAX_PER_HOUR if test_mode else MAX_PER_HOUR)
     except OtpError as exc:
         raise _otp_error(exc) from exc
     existing = db.execute(select(User).where(User.phone_e164 == phone)).scalar_one_or_none()
-    test_mode = settings.demo_mode or not settings.is_production
     return OtpRequested(phone=phone, is_new_user=existing is None,
                         needs_consent=existing is None or existing.consented_at is None, test_mode=test_mode,
                         test_code=issued.code if test_mode else None)
 
 
-@router.post("/otp/verify", response_model=AuthOut, dependencies=[Depends(rate_limit("verify", 20, 600))])
+@router.post("/otp/verify", response_model=AuthOut, dependencies=[Depends(rate_limit("verify", 60, 600))])
 def otp_verify(body: OtpVerify, request: Request, response: Response, db: Session = Depends(get_db),
                settings: Settings = Depends(get_settings)) -> AuthOut:
     try:

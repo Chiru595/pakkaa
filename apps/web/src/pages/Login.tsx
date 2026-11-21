@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { Button, ErrorText, Field, Logo, Screen } from '../components/ui'
 import { Api, type OtpRequested } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { useDemoGuide } from '../lib/demo'
 import { digitsOnlyPhone, formatPhone } from '../lib/phone'
 
 const RESEND_SECONDS = 30
@@ -18,6 +19,7 @@ export default function Login({ context }: { context?: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resendIn, setResendIn] = useState(0)
+  const demo = useDemoGuide()
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -99,6 +101,20 @@ export default function Login({ context }: { context?: string }) {
               <p id="phone-hint" className="text-xs text-slate-500">
                 10-digit Indian mobile number. We send a one-time code to verify it.
               </p>
+              {demo && (
+                <div className="flex flex-wrap gap-1.5 pt-1" aria-label="Demo accounts">
+                  {demo.accounts.slice(0, 5).map((acc) => (
+                    <button
+                      key={acc.phone}
+                      type="button"
+                      onClick={() => setPhone(acc.phone)}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:border-brand"
+                    >
+                      {acc.name.split(' ')[0]} · {acc.role.replace('_guest', '')}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <ErrorText>{error}</ErrorText>
             <Button type="submit" className="w-full" busy={busy} disabled={!phoneValid}>

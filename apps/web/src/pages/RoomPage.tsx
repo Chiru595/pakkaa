@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router'
 
 import CopilotBar, { type Chosen } from '../components/deal/CopilotBar'
 import TermSheetPanel from '../components/deal/TermSheetPanel'
+import CardsPanel from '../components/paylane/CardsPanel'
+import IncomingCall from '../components/paylane/IncomingCall'
 import { Badge, Button, ErrorText, Screen, Spinner, VerifiedBadge } from '../components/ui'
 import { Api, ROLE_LABEL, type Room, TEAM_ROLES } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -149,6 +151,8 @@ export default function RoomPage() {
   const [trigger, setTrigger] = useState<{ id: string; at: number } | null>(null)
   const [warnings, setWarnings] = useState<PresendWarning[]>([])
   const [chosen, setChosen] = useState<Chosen | null>(null)
+  const [showCards, setShowCards] = useState(false)
+  const [focusCard, setFocusCard] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const myChatId = user ? `u${user.id}` : ''
   const myChatIdRef = useRef(myChatId)
@@ -156,6 +160,8 @@ export default function RoomPage() {
     myChatIdRef.current = myChatId
   }, [myChatId])
   const isDeal = room?.type === 'deal' && (room.my_side === 'provider' || room.my_side === 'client')
+  const myRole = room ? user?.orgs.find((o) => o.org_id === room.org_id)?.role : undefined
+  const isTeamLane = room?.type === 'paylane' && !!myRole && TEAM_ROLES.includes(myRole)
 
   const reloadDeal = useCallback(async () => {
     try {
@@ -271,6 +277,20 @@ export default function RoomPage() {
           )}
         </header>
         {isDeal && deal && <DealBar deal={deal} onOpen={() => setShowSheet(true)} />}
+        {isTeamLane && (
+          <button
+            type="button"
+            onClick={() => {
+              setFocusCard(null)
+              setShowCards(true)
+            }}
+            className="flex w-full items-center gap-2 border-b border-slate-100 bg-sky-50/70 px-4 py-2 text-left text-sm"
+          >
+            <span aria-hidden>💸</span>
+            <span className="flex-1 font-semibold text-ink">Payments, payees and kill switch</span>
+            <span className="text-xs text-slate-500">Open</span>
+          </button>
+        )}
 
         <section className="flex-1 space-y-2 overflow-y-auto bg-slate-50 px-3 py-4" aria-live="polite">
           {!room && !error && (
@@ -281,6 +301,21 @@ export default function RoomPage() {
           {lines.map((l) => {
             if (l.kind === 'card' && (l.card?.kind === 'payment_link' || l.card?.kind === 'payment_status')) {
               return <PaymentCard key={l.id} line={l} />
+            }
+            if (l.kind === 'card' && l.card?.kind === 'payment_card' && isTeamLane) {
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => {
+                    setFocusCard(String(l.card?.card_id ?? ''))
+                    setShowCards(true)
+                  }}
+                  className="mx-auto block w-full max-w-[90%] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-sm hover:border-brand"
+                >
+                  💸 {l.text}
+                </button>
+              )
             }
             if (l.kind === 'card') {
               return (
@@ -348,6 +383,10 @@ export default function RoomPage() {
           </Button>
         </form>
         {showMembers && room && <MembersSheet room={room} onClose={() => setShowMembers(false)} />}
+        {showCards && room && myRole && (
+          <CardsPanel roomId={room.id} orgId={room.org_id} role={myRole} focusCardId={focusCard} onClose={() => setShowCards(false)} />
+        )}
+        <IncomingCall nameFor={(chatId) => names.get(chatId)?.name ?? 'A teammate'} />
         {showSheet && deal && (
           <TermSheetPanel
             roomId={roomId}

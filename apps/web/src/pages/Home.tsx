@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 
 import { Badge, Button, ErrorText, Field, Logo, Screen } from '../components/ui'
 import { Api, ROLE_LABEL, type Room, type RoomType, TEAM_ROLES } from '../lib/api'
+import { type AskAnswer, PayApi } from '../lib/paylane'
 import { useAuth } from '../lib/auth'
 
 function CreateOrg() {
@@ -102,6 +103,62 @@ function NewRoom({ orgId, onCreated }: { orgId: string; onCreated: (room: Room) 
         </Button>
       </div>
     </form>
+  )
+}
+
+function AskBox({ orgId }: { orgId: string }) {
+  const [q, setQ] = useState('')
+  const [answer, setAnswer] = useState<AskAnswer | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function ask(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      setAnswer(await PayApi.ask(orgId, q.trim()))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not answer')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="space-y-2 rounded-2xl bg-slate-50 p-3">
+      <form onSubmit={ask} className="flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          maxLength={300}
+          minLength={3}
+          placeholder="Ask Pakkaa: have we paid GSTIN 27AAPFU0939F1ZV?"
+          aria-label="Ask Pakkaa"
+          className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        />
+        <Button type="submit" busy={busy} disabled={q.trim().length < 3} className="px-3 py-2">
+          Ask
+        </Button>
+      </form>
+      <ErrorText>{error}</ErrorText>
+      {answer && (
+        <div className="space-y-1 text-sm">
+          <p className="text-ink">{answer.answer}</p>
+          <details className="text-xs text-slate-500">
+            <summary>Sources ({answer.facts.length})</summary>
+            <ul className="mt-1 space-y-0.5">
+              {answer.facts.map((f) => (
+                <li key={f.id}>
+                  [{f.id}] {f.text}
+                </li>
+              ))}
+            </ul>
+          </details>
+          <p className="text-[11px] text-slate-400">{answer.disclaimer}</p>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -206,6 +263,7 @@ export default function Home() {
             )}
           </div>
           {isTeam && <NewRoom orgId={org.org_id} onCreated={(r) => navigate(`/rooms/${r.id}`)} />}
+          {isTeam && <AskBox orgId={org.org_id} />}
           <ErrorText>{error}</ErrorText>
           <section>
             <h2 className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Deal Rooms</h2>

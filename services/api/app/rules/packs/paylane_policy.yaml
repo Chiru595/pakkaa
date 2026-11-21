@@ -1,0 +1,27 @@
+# Pay Lane approval bands and risk thresholds. Learning may tighten these; loosening needs an owner's logged change.
+pack: paylane_policy
+version: 1
+as_of: "2026-11-21"
+source: "Pakkaa default policy for small teams (hackathon build)."
+disclaimer: "Risk checks are guidance for your team, not a guarantee against fraud."
+approval_bands:
+  - up_to_rupees: 10000
+    approvals: 1
+    owner_required: false
+  - up_to_rupees: 100000
+    approvals: 2
+    owner_required: false
+  - up_to_rupees: null
+    approvals: 2
+    owner_required: true
+approver_roles: [owner, finance]
+risk:
+  high_at: 60
+  medium_at: 30
+  bank_change_window_days: 30
+  baseline_multiplier: 1.5
+  no_baseline_large_rupees: 50000
+  split_window_days: 7
+  working_hours_ist: [9, 20]
+  urgency_words: [urgent, urgently, immediately, asap, "right now", "today itself", "within an hour", jaldi, turant, abhi, fauran]
+  secrecy_words: [confidential, "don't tell", "do not tell", "keep this between us", "dont tell", secret, "kisi ko mat", "mat batana", quietly]

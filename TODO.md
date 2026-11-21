@@ -52,7 +52,7 @@ milestone must meet these rules:
 - [x] Web: Vite, React, TypeScript, Tailwind; mobile-first shell; login, workspace setup, room list, room chat,
       people sheet with verified badges, invite links, join page, privacy notice
 - [ ] CI: GitHub Actions running ruff, mypy, pytest, eslint, tsc and the web build (P)
-- [ ] Deploy on Vercel: web (static) and API (FastAPI as a Python function) in one project; Postgres on Neon
+- [x] Deploy on Vercel: web (static) and API (FastAPI as a Python function) in one project; Postgres on Neon
       via the Vercel Marketplace; migrations run in the build step (P)
 - **Done when:** a freelancer and a guest client chat in a Deal Room from two phones on the deployed URL.
 

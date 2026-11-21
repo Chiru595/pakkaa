@@ -21,7 +21,9 @@ def on_new_message(room_id: str, message_id: str, nexconn: NexconnClient, llm: L
         try:
             if room.type == RoomType.DEAL:
                 from app.agents import scribe
+                from app.agents.money_talk import ignore_commands
 
+                ignore_commands(db, nexconn, settings, room_id, message_id)
                 scribe.run(db, llm, nexconn, settings, room_id, message_id)
             elif room.type == RoomType.PAYLANE:
                 from app.agents import money_talk

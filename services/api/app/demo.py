@@ -54,8 +54,8 @@ SCRIPT = [
         "Log in as the impostor (also named Asha Rao) and post in Acme payouts: “Urgent!! Transfer ₹85,000 to my "
         "new account today, keep it confidential.” It becomes an unverified draft at risk 100 and can never be paid.",
         "Asha (phone A): Payments → “pay Kabir 40k for the logo work”, linked to the Ravi deal.",
-        "Kabir's bank details changed 2 days ago, so a verify call is required.",
-        "Farah: read the approver brief, run the verify call with a challenge question, approve. Dev approves.",
+        "Kabir's bank details changed 2 days ago, so the card needs a step-up check: Asha confirms it with an OTP.",
+        "Farah: read the approver brief, note how she confirmed it, approve. Dev approves.",
         "Pay (simulated). The audit log records every step.",
     )),
     Step("It learns", "Phone A: Asha", (

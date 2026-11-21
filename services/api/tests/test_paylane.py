@@ -107,35 +107,117 @@ def test_amount_edit_after_one_approval_resets_approvals(client, team, db):
     assert {r.card_version for r in rows} == {1, 2}
 
 
-def test_bank_change_plus_urgency_is_high_risk_and_needs_verify_call(client, team):
-    pid = team["payee"]["id"]
-    seed = new_card(client, team, amount=3_000_000, reason="Earlier logo work")
-    act(client, team, "finance", seed, "approve", version=1)
-    act(client, team, "owner", seed, "approve", version=1)
-    act(client, team, "finance", seed, "payout", idempotency_key="seed-" + "x" * 16)
-    r = client.put(f"/api/orgs/{team['org']}/payees/{pid}/details",
-                   json={"method": "bank", "account_number": "123456789012", "ifsc": "ICIC0004321"},
-                   headers=team["finance"]["headers"])
-    assert r.status_code == 200 and r.json()["details_changed_at"]
-    card = new_card(client, team, amount=3_000_000, reason="URGENT final logo payment, please pay immediately")
+def _high_risk_card(client, t, amount=3_000_000, reason="URGENT final logo payment, please pay immediately"):
+    pid = t["payee"]["id"]
+    if not t.get("_seeded"):
+        seed = new_card(client, t, amount=3_000_000, reason="Earlier logo work")
+        act(client, t, "finance", seed, "approve", version=1)
+        act(client, t, "owner", seed, "approve", version=1)
+        act(client, t, "finance", seed, "payout", idempotency_key="seed-" + "x" * 16)
+        r = client.put(f"/api/orgs/{t['org']}/payees/{pid}/details",
+                       json={"method": "bank", "account_number": "123456789012", "ifsc": "ICIC0004321"},
+                       headers=t["finance"]["headers"])
+        assert r.status_code == 200 and r.json()["details_changed_at"]
+        t["_seeded"] = True
+    return new_card(client, t, amount=amount, reason=reason)
+
+
+def step_up_request(client, t, who, card):
+    return act(client, t, who, card, "step-up/request", version=card["version"], hash=card["card_hash"])
+
+
+def step_up(client, t, who, card, code):
+    return act(client, t, who, card, "step-up", version=card["version"], hash=card["card_hash"], code=code)
+
+
+def test_bank_change_plus_urgency_is_high_risk_and_needs_requester_step_up(client, team, db):
+    card = _high_risk_card(client, team)
     rules = {s["rule_id"] for s in card["signals"]}
     assert {"bank_changed", "urgency"} <= rules
-    assert card["risk_level"] == "high" and card["verify_call_required"]
+    assert card["risk_level"] == "high" and card["step_up_required"] and not card["step_up_done"]
+    assert card["viewer"]["can_step_up"] and "OTP" in card["viewer"]["blocked_reason"]
     assert act(client, team, "finance", card, "approve", version=1).status_code == 409
-    assert act(client, team, "member", card, "verify-call").status_code == 403
-    call = act(client, team, "finance", card, "verify-call").json()
-    assert call["callee_name"] == "Mo" and call["callee_chat_id"] == team["member"]["user"]["chat_id"]
-    assert all("otp" not in q["q"].lower() and "pin" not in q["q"].lower() for q in call["questions"])
-    assert any("last pay" in q["q"] for q in call["questions"])
-    done = client.post(f"/api/cards/{card['id']}/verify-call/{call['call_id']}/complete",
-                       json={"outcome": "confirmed", "notes": "Mo confirmed on call", "duration_s": 75},
-                       headers=team["finance"]["headers"]).json()
-    assert done["verify_call"]["outcome"] == "confirmed" and done["viewer"]["can_approve"]
+    assert step_up_request(client, team, "finance", card).status_code == 403
+    assert step_up_request(client, team, "owner", card).status_code == 403
+    req = step_up_request(client, team, "member", card)
+    assert req.status_code == 200 and req.json()["phone_last4"] == "0005" and req.json()["test_code"]
+    wrong = "000000" if req.json()["test_code"] != "000000" else "111111"
+    assert step_up(client, team, "member", card, wrong).status_code == 400
+    done = step_up(client, team, "member", card, req.json()["test_code"])
+    assert done.status_code == 200, done.text
+    assert done.json()["step_up_done"] and not done.json()["viewer"]["can_step_up"]
+    seen = client.get(f"/api/cards/{card['id']}", headers=team["finance"]["headers"]).json()
+    assert seen["viewer"]["can_approve"] and seen["viewer"]["blocked_reason"] is None
     assert act(client, team, "finance", card, "approve", version=1).status_code == 400
     assert act(client, team, "finance", card, "approve", version=1, override_reason="  ok  ").status_code == 400
     r = act(client, team, "finance", card, "approve", version=1,
-            override_reason="Mo confirmed the new bank on a verify call")
+            override_reason="Mo confirmed the new bank details in person")
     assert r.status_code == 200
+    actions = db.execute(select(AuditEvent.action)).scalars().all()
+    assert {"card.step_up_requested", "card.step_up_failed", "card.step_up_confirmed"} <= set(actions)
+
+
+def test_step_up_code_is_single_use_expiring_and_scoped_to_one_card(client, team, db):
+    a = _high_risk_card(client, team)
+    b = _high_risk_card(client, team, amount=2_900_000)
+    code_a = step_up_request(client, team, "member", a).json()["test_code"]
+    assert step_up(client, team, "member", b, code_a).status_code == 400
+    assert step_up(client, team, "member", a, code_a).status_code == 200
+    assert step_up(client, team, "member", a, code_a).status_code == 409
+    assert step_up_request(client, team, "member", a).status_code == 409
+    code_b = step_up_request(client, team, "member", b).json()["test_code"]
+    db.execute(text("UPDATE otp_challenges SET expires_at = created_at - interval '1 second' "
+                    "WHERE purpose LIKE 'stepup:%' AND consumed_at IS NULL"))
+    db.commit()
+    expired = step_up(client, team, "member", b, code_b)
+    assert expired.status_code == 400 and "expired" in expired.json()["detail"]
+    stale = dict(b, card_hash="0" * 64)
+    assert step_up_request(client, team, "member", stale).status_code == 409
+
+
+def test_edit_after_step_up_invalidates_it(client, team):
+    card = _high_risk_card(client, team)
+    code = step_up_request(client, team, "member", card).json()["test_code"]
+    assert step_up(client, team, "member", card, code).json()["step_up_done"]
+    edited = client.patch(f"/api/cards/{card['id']}", json={"amount_paise": 3_100_000},
+                          headers=team["member"]["headers"]).json()
+    assert edited["version"] == 2 and edited["step_up_required"] and not edited["step_up_done"]
+    assert edited["viewer"]["can_step_up"]
+    assert act(client, team, "finance", card, "approve", version=2,
+               override_reason="Confirmed in person with Mo").status_code == 409
+    assert step_up(client, team, "member", card, code).status_code == 409
+
+
+def test_guest_impostor_and_outsiders_cannot_step_up_a_team_card(client, team, login_as):
+    from tests.test_orgs_rooms import _invite_token
+
+    card = _high_risk_card(client, team)
+    impostor = login_as(VENDOR, "Mo")
+    token = _invite_token(client, team["owner"], team["lane"]["id"], role="vendor_guest")
+    assert client.post(f"/api/invites/{token}/accept", headers=impostor["headers"]).status_code == 200
+    outsider = login_as(OUTSIDER, "Mallory")
+    for headers in (impostor["headers"], outsider["headers"]):
+        r = client.post(f"/api/cards/{card['id']}/step-up/request",
+                        json={"version": 1, "hash": card["card_hash"]}, headers=headers)
+        assert r.status_code in (403, 404)
+        r = client.post(f"/api/cards/{card['id']}/step-up",
+                        json={"version": 1, "hash": card["card_hash"], "code": "123456"}, headers=headers)
+        assert r.status_code in (403, 404)
+
+
+def test_payout_of_high_risk_card_refused_without_step_up(client, team, db):
+    from app.models import CardState, PaymentCard
+
+    card = _high_risk_card(client, team)
+    row = db.get(PaymentCard, card["id"])
+    for who in ("finance", "owner"):
+        db.add(CardApproval(card_id=row.id, card_version=row.version, approver_id=team[who]["user"]["id"], role=who,
+                            override_reason="forced for test"))
+    row.state = CardState.APPROVED
+    db.commit()
+    r = act(client, team, "finance", card, "payout", idempotency_key="force-" + "z" * 16)
+    assert r.status_code == 409 and "OTP" in r.json()["detail"]
+    assert db.execute(select(Payout).where(Payout.card_id == card["id"])).first() is None
 
 
 def test_impostor_with_owner_name_is_blocked(client, team, login_as, llm, db, nexconn):

@@ -333,8 +333,9 @@ class PaymentCard(Base):
     risk_level: Mapped[str] = mapped_column(String(10), default="low")
     required_approvals: Mapped[int] = mapped_column(default=1)
     owner_approval_required: Mapped[bool] = mapped_column(default=False)
-    verify_call_required: Mapped[bool] = mapped_column(default=False)
-    verify_call_id: Mapped[str | None] = mapped_column(String(32))
+    step_up_required: Mapped[bool] = mapped_column(default=False)
+    step_up_hash: Mapped[str | None] = mapped_column(String(64))
+    step_up_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow)
     decided_at: Mapped[datetime | None]
@@ -362,21 +363,6 @@ class RiskSignal(Base):
     message: Mapped[str] = mapped_column(String(300))
     evidence: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
-
-
-class VerifyCall(Base):
-    __tablename__ = "verify_calls"
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
-    card_id: Mapped[str] = mapped_column(ForeignKey("payment_cards.id", ondelete="CASCADE"), index=True)
-    card_version: Mapped[int]
-    approver_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    callee_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    questions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    outcome: Mapped[str | None] = mapped_column(String(12))
-    summary: Mapped[str | None] = mapped_column(String(600))
-    duration_s: Mapped[int | None]
-    started_at: Mapped[datetime] = mapped_column(default=utcnow)
-    ended_at: Mapped[datetime | None]
 
 
 class Payout(Base):

@@ -2,6 +2,8 @@
 in code, regardless of what any message or AI output says."""
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -23,7 +25,6 @@ from app.models import (
     Room,
     RoomType,
     User,
-    VerifyCall,
 )
 from app.payments import PaymentProvider
 from app.security import audit
@@ -54,7 +55,7 @@ def require_not_frozen(db: Session, org_id: str) -> None:
 
 def _apply_assessment(db: Session, card: PaymentCard, a: R.Assessment) -> None:
     card.risk_score, card.risk_level = a.score, a.level
-    card.verify_call_required = a.verify_call_required
+    card.step_up_required = a.step_up_required
     card.required_approvals, card.owner_approval_required = R.approval_band(card.amount_paise)
     for s in a.signals:
         db.add(RiskSignal(card_id=card.id, card_version=card.version, rule_id=s.rule_id, weight=s.weight,
@@ -120,7 +121,7 @@ def edit_card(db: Session, card: PaymentCard, actor: User, membership: Membershi
     if "amount_paise" in changed or "payee_id" in changed:
         voided = len(approvals(db, card))
         card.version += 1
-        card.verify_call_id = None
+        card.step_up_hash, card.step_up_at = None, None
     card.updated_at = utcnow()
     requester_role = None
     if card.requester_id:
@@ -132,6 +133,52 @@ def edit_card(db: Session, card: PaymentCard, actor: User, membership: Membershi
                  subject_id=card.id, payload={"changed": changed, "version": card.version,
                                               "approvals_reset": voided})
     return True
+
+
+STEP_UP_REFUSED = "High risk: the requester must confirm this exact card with an OTP before it can be approved"
+
+
+def card_hash(db: Session, card: PaymentCard) -> str:
+    """What the requester re-confirms in a step-up check: this version's amount and payee account."""
+    payee = db.get(Payee, card.payee_id) if card.payee_id else None
+    body = {"card_id": card.id, "version": card.version, "amount_paise": card.amount_paise,
+            "payee_id": card.payee_id, "payee_masked": payee.masked if payee else None}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def step_up_done(db: Session, card: PaymentCard) -> bool:
+    return bool(card.step_up_hash) and card.step_up_hash == card_hash(db, card)
+
+
+def require_step_up(db: Session, card: PaymentCard) -> None:
+    if card.step_up_required and not step_up_done(db, card):
+        raise HTTPException(status.HTTP_409_CONFLICT, STEP_UP_REFUSED)
+
+
+def check_step_up_target(db: Session, card: PaymentCard, actor: User, membership: Membership, version: int,
+                         target_hash: str) -> str:
+    """Only the verified team member who raised a pending high-risk card can confirm it, for its current version."""
+    if actor.id != card.requester_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the person who requested this payment can confirm it")
+    if membership.role not in TEAM_ROLES or actor.phone_verified_at is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a verified team member can confirm a payment")
+    if card.state != CardState.PENDING:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This card is not waiting for approval")
+    if not card.step_up_required:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This card does not need a step-up check")
+    current = card_hash(db, card)
+    if version != card.version or target_hash != current:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The card changed. Review the latest amount and payee")
+    if step_up_done(db, card):
+        raise HTTPException(status.HTTP_409_CONFLICT, "You already confirmed this version")
+    return current
+
+
+def complete_step_up(db: Session, card: PaymentCard, actor: User, confirmed_hash: str) -> None:
+    card.step_up_hash, card.step_up_at = confirmed_hash, utcnow()
+    audit.record(db, "card.step_up_confirmed", actor_user_id=actor.id, org_id=card.org_id,
+                 subject_type="payment_card", subject_id=card.id,
+                 payload={"version": card.version, "hash": confirmed_hash, "method": "otp"})
 
 
 OVERRIDE_REASON_MIN = 10
@@ -155,10 +202,7 @@ def approve(db: Session, card: PaymentCard, actor: User, membership: Membership,
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You requested this payment, so someone else must approve it")
     if card.payee_id is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Pick a verified payee before approving")
-    if card.verify_call_required:
-        call = db.get(VerifyCall, card.verify_call_id) if card.verify_call_id else None
-        if call is None or call.outcome != "confirmed" or call.card_version != card.version:
-            raise HTTPException(status.HTTP_409_CONFLICT, "High risk: complete a verify call with the requester first")
+    require_step_up(db, card)
     current = approvals(db, card)
     if any(a.approver_id == actor.id for a in current):
         raise HTTPException(status.HTTP_409_CONFLICT, "You already approved this version")
@@ -195,6 +239,7 @@ def payout(db: Session, card: PaymentCard, actor: User, membership: Membership, 
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and finance can release payouts")
     if card.state != CardState.APPROVED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Only approved cards can be paid")
+    require_step_up(db, card)
     current = approvals(db, card)
     if len(current) < card.required_approvals:
         raise HTTPException(status.HTTP_409_CONFLICT, "Approvals are incomplete for this version")

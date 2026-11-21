@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import paylane_ai as AI
 from app.config import Settings, get_settings
-from app.db import get_db, utcnow
+from app.db import get_db
 from app.deps import get_llm_dep, get_nexconn
 from app.domain import paylane as P
 from app.domain import terms as T
@@ -34,13 +34,20 @@ from app.models import (
     TermSheet,
     TermSheetStatus,
     User,
-    VerifyCall,
 )
 from app.money import MAX_AMOUNT_PAISE, format_inr
 from app.payments import PaymentProvider, get_payment_provider
-from app.schemas import ObjectId, bounded_text
+from app.routers.auth import otp_provider
+from app.schemas import ObjectId, OtpCode, bounded_text
 from app.security import audit
 from app.security.deps import current_user, membership_for, rate_limit, require_org_role, room_access
+from app.security.otp import (
+    MAX_PER_HOUR,
+    TEST_MODE_MAX_PER_HOUR,
+    OtpError,
+    request_otp,
+    verify_otp,
+)
 
 router = APIRouter(prefix="/api", tags=["paylane"])
 
@@ -79,7 +86,7 @@ class ViewerOut(BaseModel):
     can_approve: bool
     can_edit: bool
     can_payout: bool
-    can_verify: bool
+    can_step_up: bool
     can_reject: bool
     is_approver: bool
     blocked_reason: str | None
@@ -105,8 +112,10 @@ class CardOut(BaseModel):
     required_approvals: int
     owner_approval_required: bool
     approvals: list[ApprovalOut]
-    verify_call_required: bool
-    verify_call: dict[str, Any] | None
+    step_up_required: bool
+    step_up_done: bool
+    step_up_at: datetime | None
+    card_hash: str
     payout: dict[str, Any] | None
     viewer: ViewerOut
     created_at: datetime
@@ -163,19 +172,19 @@ class BriefOut(BaseModel):
     disclaimer: str = "The brief only summarises facts. It never approves anything."
 
 
-class VerifyStartOut(BaseModel):
-    call_id: str
-    callee_chat_id: str
-    callee_name: str
-    callee_phone_last4: str
-    questions: list[dict[str, str]]
-    warning: str
+class StepUpTarget(BaseModel):
+    version: int = Field(ge=1)
+    hash: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-class VerifyDoneIn(BaseModel):
-    outcome: Literal["confirmed", "suspicious"]
-    notes: bounded_text(0, 500, multiline=True) = ""  # type: ignore[valid-type]
-    duration_s: int = Field(default=0, ge=0, le=7200)
+class StepUpRequestOut(StepUpTarget):
+    phone_last4: str
+    test_mode: bool
+    test_code: str | None = None
+
+
+class StepUpIn(StepUpTarget):
+    code: OtpCode
 
 
 class PayoutIn(BaseModel):
@@ -240,25 +249,28 @@ def card_out(db: Session, card: PaymentCard, viewer: User, membership: Membershi
     appr = P.approvals(db, card)
     approver_ids = [a.approver_id for a in appr]
     names = {u.id: u.name for u in db.execute(select(User).where(User.id.in_(approver_ids))).scalars()}
-    call = db.get(VerifyCall, card.verify_call_id) if card.verify_call_id else None
     payout = db.execute(select(Payout).where(Payout.card_id == card.id)).scalar_one_or_none()
     frozen = P.control(db, card.org_id).frozen
     is_approver = membership.role in P.APPROVER_ROLES
     mine = card.requester_id == viewer.id
     already = any(a.approver_id == viewer.id for a in appr)
-    call_ok = not card.verify_call_required or (call is not None and call.outcome == "confirmed"
-                                               and call.card_version == card.version)
+    current_hash = P.card_hash(db, card)
+    stepped_up = bool(card.step_up_hash) and card.step_up_hash == current_hash
+    step_up_ok = not card.step_up_required or stepped_up
     blocked = None
     if card.state == CardState.UNVERIFIED:
         blocked = "Spotted in chat. Chat messages cannot move money; a verified team member must raise a card"
     elif frozen:
         blocked = "Payments are frozen"
+    elif card.state == CardState.PENDING and mine and not step_up_ok:
+        blocked = ("Step-up check: confirm this exact card with the OTP sent to your phone, then someone else "
+                   "approves it")
     elif card.state == CardState.PENDING and mine:
         blocked = "You requested this payment, so someone else must approve it"
-    elif card.state == CardState.PENDING and not call_ok:
-        blocked = "High risk: verify call needed before approval"
+    elif card.state == CardState.PENDING and not step_up_ok:
+        blocked = "Step-up check: the requester confirms this exact card with an OTP before anyone can approve it"
     can_approve = (card.state == CardState.PENDING and is_approver and not mine and not already and not frozen
-                   and call_ok and card.payee_id is not None)
+                   and step_up_ok and card.payee_id is not None)
     return CardOut(
         id=card.id, number=card.number, room_id=card.room_id, state=card.state, version=card.version,
         amount_paise=card.amount_paise, amount_display=format_inr(card.amount_paise), reason=card.reason,
@@ -271,15 +283,16 @@ def card_out(db: Session, card: PaymentCard, viewer: User, membership: Membershi
                  for s in signals],
         required_approvals=card.required_approvals, owner_approval_required=card.owner_approval_required,
         approvals=[ApprovalOut(name=names.get(a.approver_id, "?"), role=a.role, at=a.created_at) for a in appr],
-        verify_call_required=card.verify_call_required,
-        verify_call={"outcome": call.outcome, "summary": call.summary, "ended_at": call.ended_at} if call else None,
+        step_up_required=card.step_up_required, step_up_done=stepped_up,
+        step_up_at=card.step_up_at if stepped_up else None, card_hash=current_hash,
         payout={"provider": payout.provider, "provider_ref": payout.provider_ref, "status": payout.status,
                 "at": payout.created_at, "simulated": payout.provider == "simulated"} if payout else None,
         viewer=ViewerOut(can_approve=can_approve,
                          can_edit=card.state == CardState.PENDING and (mine or is_approver),
                          can_payout=card.state == CardState.APPROVED and is_approver and not frozen,
-                         can_verify=(card.state == CardState.PENDING and card.verify_call_required and is_approver
-                                     and not mine and card.requester_id is not None),
+                         can_step_up=(card.state == CardState.PENDING and card.step_up_required and mine
+                                      and not stepped_up and membership.role in TEAM_ROLES
+                                      and viewer.phone_verified_at is not None),
                          can_reject=card.state in (CardState.PENDING, CardState.APPROVED, CardState.UNVERIFIED)
                          and (is_approver or mine), is_approver=is_approver, blocked_reason=blocked),
         created_at=card.created_at)
@@ -474,80 +487,50 @@ def brief(card_id: str, user: User = Depends(current_user), db: Session = Depend
     return BriefOut(lines=[worded.deal_line, worded.payee_line, worded.rules_line], evidence=evidence, ai_worded=ai)
 
 
-@router.post("/cards/{card_id}/verify-call", response_model=VerifyStartOut,
-             dependencies=[Depends(rate_limit("verify-call", 20, 60))])
-def start_verify_call(card_id: str, user: User = Depends(current_user),
-                      db: Session = Depends(get_db)) -> VerifyStartOut:
-    """The approver calls the requester's verified in-app account. No phone number from the request is ever used."""
+def _step_up_purpose(card: PaymentCard, card_hash: str) -> str:
+    return f"stepup:{card.id}:{card_hash[:16]}"
+
+
+@router.post("/cards/{card_id}/step-up/request", response_model=StepUpRequestOut,
+             dependencies=[Depends(rate_limit("step-up-otp", 30, 600))])
+def request_step_up(card_id: str, body: StepUpTarget, user: User = Depends(current_user),
+                    db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> StepUpRequestOut:
+    """Sends a one-time code to the requester's verified phone, scoped to this card version and its hash."""
     card, m = _card(db, user, card_id)
-    if m.role not in P.APPROVER_ROLES or card.requester_id in (None, user.id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only another approver can run the verify call")
-    if card.state != CardState.PENDING:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This card is not waiting for approval")
-    callee = db.get(User, card.requester_id)
-    callee_m = membership_for(db, card.requester_id, card.org_id)
-    if callee is None or callee_m is None or callee_m.role not in TEAM_ROLES or callee.phone_verified_at is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "The requester is not a verified team member; reject the card")
-    questions = challenge_questions(db, card)
-    call = VerifyCall(card_id=card.id, card_version=card.version, approver_id=user.id, callee_id=callee.id,
-                      questions=questions)
-    db.add(call)
-    db.flush()
-    audit.record(db, "verify_call.start", actor_user_id=user.id, org_id=card.org_id, subject_type="payment_card",
-                 subject_id=card.id, payload={"call_id": call.id, "callee": callee.id, "version": card.version})
+    target = P.check_step_up_target(db, card, user, m, body.version, body.hash)
+    test_mode = settings.demo_mode or not settings.is_production
+    try:
+        issued = request_otp(db, user.phone_e164, settings.otp_pepper, otp_provider, _step_up_purpose(card, target),
+                             max_per_hour=TEST_MODE_MAX_PER_HOUR if test_mode else MAX_PER_HOUR)
+    except OtpError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+    audit.record(db, "card.step_up_requested", actor_user_id=user.id, org_id=card.org_id,
+                 subject_type="payment_card", subject_id=card.id, payload={"version": card.version, "hash": target})
     db.commit()
-    return VerifyStartOut(call_id=call.id, callee_chat_id=callee.chat_id, callee_name=callee.name,
-                          callee_phone_last4=callee.phone_last4, questions=questions,
-                          warning="Never ask for or share OTPs, PINs or passwords on this call.")
+    return StepUpRequestOut(version=card.version, hash=target, phone_last4=user.phone_last4, test_mode=test_mode,
+                            test_code=issued.code if test_mode else None)
 
 
-def challenge_questions(db: Session, card: PaymentCard) -> list[dict[str, str]]:
-    """Built only from the organisation's own records, so only the real teammate can answer."""
-    qs: list[dict[str, str]] = []
-    if card.deal_room_id:
-        deal = db.get(Room, card.deal_room_id)
-        if deal:
-            qs.append({"q": "Which client project is this payment for?", "expected": deal.title})
-    if card.payee_id:
-        payee = db.get(Payee, card.payee_id)
-        last = db.execute(select(PaymentCard).where(PaymentCard.payee_id == card.payee_id,
-                                                    PaymentCard.state == CardState.PAID, PaymentCard.id != card.id)
-                          .order_by(PaymentCard.created_at.desc()).limit(1)).scalar_one_or_none()
-        if payee and last:
-            qs.append({"q": f"When did we last pay {payee.name}, and roughly how much?",
-                       "expected": f"{last.created_at.astimezone(IST):%d %b %Y}, {format_inr(last.amount_paise)}"})
-        elif payee:
-            qs.append({"q": f"Have we paid {payee.name} before?", "expected": "No, this is the first payment"})
-        if payee and payee.details_changed_at:
-            qs.append({"q": f"Who told you {payee.name}'s bank details changed, and how?",
-                       "expected": "Should match a call you can confirm independently"})
-    room = db.get(Room, card.room_id)
-    qs.append({"q": "Which Pay Lane did you raise this in?", "expected": room.title if room else "?"})
-    qs.append({"q": "What exactly is this payment for?", "expected": card.reason})
-    return qs[:4]
-
-
-@router.post("/cards/{card_id}/verify-call/{call_id}/complete", response_model=CardOut,
-             dependencies=[Depends(rate_limit("verify-call", 20, 60))])
-def complete_verify_call(card_id: str, call_id: str, body: VerifyDoneIn, user: User = Depends(current_user),
-                         db: Session = Depends(get_db), settings: Settings = Depends(get_settings),
-                         nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
+@router.post("/cards/{card_id}/step-up", response_model=CardOut, dependencies=[Depends(rate_limit("step-up", 20, 600))])
+def confirm_step_up(card_id: str, body: StepUpIn, user: User = Depends(current_user), db: Session = Depends(get_db),
+                    settings: Settings = Depends(get_settings),
+                    nexconn: NexconnClient = Depends(get_nexconn)) -> CardOut:
     card, m = _card(db, user, card_id)
-    call = db.get(VerifyCall, call_id)
-    if call is None or call.card_id != card.id or call.approver_id != user.id or call.outcome is not None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
-    call.outcome, call.ended_at, call.duration_s = body.outcome, utcnow(), body.duration_s
-    call.summary = " ".join(body.notes.split())[:500] or None
-    if body.outcome == "confirmed" and call.card_version == card.version:
-        card.verify_call_id = call.id
-    audit.record(db, "verify_call.complete", actor_user_id=user.id, org_id=card.org_id, subject_type="payment_card",
-                 subject_id=card.id, payload={"call_id": call.id, "outcome": body.outcome,
-                                              "duration_s": body.duration_s})
-    if body.outcome == "suspicious":
-        P.reject(db, card, user, m, "verify call: suspicious")
+    target = P.check_step_up_target(db, card, user, m, body.version, body.hash)
+    try:
+        verify_otp(db, user.phone_e164, body.code, settings.otp_pepper, _step_up_purpose(card, target))
+    except OtpError as exc:
+        audit.record(db, "card.step_up_failed", actor_user_id=user.id, org_id=card.org_id,
+                     subject_type="payment_card", subject_id=card.id, payload={"version": card.version,
+                                                                               "reason": str(exc)[:80]})
+        db.commit()
+        raise HTTPException(exc.status, str(exc)) from exc
+    card = db.execute(select(PaymentCard).where(PaymentCard.id == card.id).with_for_update()
+                      .execution_options(populate_existing=True)).scalar_one()
+    target = P.check_step_up_target(db, card, user, m, body.version, body.hash)
+    P.complete_step_up(db, card, user, target)
     db.commit()
-    verdict = "confirmed by the requester" if body.outcome == "confirmed" else "flagged suspicious; card rejected"
-    _notify(db, nexconn, settings, card, f"Card #{card.number}: verify call {verdict}")
+    _notify(db, nexconn, settings, card, f"Card #{card.number}: {user.name} confirmed it with an OTP")
     return card_out(db, card, user, m)
 
 

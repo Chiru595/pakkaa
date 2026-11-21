@@ -32,7 +32,7 @@ class Assessment:
     score: int
     level: str
     signals: list[Signal]
-    verify_call_required: bool
+    step_up_required: bool
 
 
 def policy() -> dict[str, Any]:
@@ -176,4 +176,4 @@ def assess(db: Session, *, org_id: str, card_id: str | None, payee_id: str | Non
                               "payment-fraud pattern", {}))
     score = min(100, sum(s.weight for s in signals))
     level = "high" if score >= p["high_at"] else "medium" if score >= p["medium_at"] else "low"
-    return Assessment(score, level, signals, verify_call_required=level == "high" or "bank_changed" in fired)
+    return Assessment(score, level, signals, step_up_required=level == "high" or "bank_changed" in fired)

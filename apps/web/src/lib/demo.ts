@@ -10,6 +10,7 @@ export interface DemoAccount {
 }
 
 export interface DemoGuide {
+  enabled: boolean
   org_name: string
   accounts: DemoAccount[]
   steps: { title: string; who: string; actions: string[] }[]
@@ -19,7 +20,9 @@ export interface DemoGuide {
 let cached: Promise<DemoGuide | null> | null = null
 
 export function loadDemoGuide(): Promise<DemoGuide | null> {
-  cached ??= api<DemoGuide>('/api/demo', {}, false).catch(() => null)
+  cached ??= api<DemoGuide>('/api/demo', {}, false)
+    .then((g) => (g.enabled ? g : null))
+    .catch(() => null)
   return cached
 }
 

@@ -331,6 +331,13 @@ export default function RoomPage() {
               )
             }
             if (l.kind === 'card' && l.card?.kind === 'memory_warning') {
+              if (deal && deal.counterparty_notes.length > 0) {
+                return (
+                  <p key={l.id} role="note" className="mx-auto w-fit rounded-full bg-amber-50 px-3 py-1 text-center text-xs text-amber-900 ring-1 ring-amber-200">
+                    🔒 Private heads-up pinned above · only your side sees it
+                  </p>
+                )
+              }
               return (
                 <p key={l.id} role="note" className="mx-auto max-w-[90%] rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-900">
                   🔒 {l.text}

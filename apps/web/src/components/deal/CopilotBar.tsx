@@ -148,18 +148,20 @@ export default function CopilotBar({ roomId, side, trigger, warnings, onUse }: {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1 text-xs font-semibold text-brand"
+          className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-brand"
           aria-expanded={open}
+          title="Only you see your copilot"
         >
-          ✨ Your copilot <span className="font-normal text-slate-400">(only you see this)</span>
+          ✨ Your copilot
+          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">🔒 private</span>
         </button>
-        <div className="ml-auto flex gap-1">
-          <button type="button" className="rounded-lg px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" onClick={() => setLimits((l) => !l)}>
+        <div className="ml-auto flex shrink-0 gap-1">
+          <button type="button" className="whitespace-nowrap rounded-lg px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" onClick={() => setLimits((l) => !l)}>
             My limits
           </button>
           <button
             type="button"
-            className="rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-emerald-50 disabled:text-slate-400"
+            className="whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-emerald-50 disabled:text-slate-400"
             onClick={() => void suggest(null)}
             disabled={streaming}
           >

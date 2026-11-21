@@ -81,7 +81,7 @@ After a restart, run `scripts/dev_db.py` again (if you use the embedded database
 ## Tests
 
 ```powershell
-cd servicespi
+cd services\api
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python -m ruff check app tests
 cd ..\..\apps\web

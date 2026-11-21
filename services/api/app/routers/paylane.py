@@ -80,6 +80,7 @@ class ViewerOut(BaseModel):
     can_payout: bool
     can_verify: bool
     can_reject: bool
+    is_approver: bool
     blocked_reason: str | None
 
 
@@ -279,7 +280,7 @@ def card_out(db: Session, card: PaymentCard, viewer: User, membership: Membershi
                          can_verify=(card.state == CardState.PENDING and card.verify_call_required and is_approver
                                      and not mine and card.requester_id is not None),
                          can_reject=card.state in (CardState.PENDING, CardState.APPROVED, CardState.UNVERIFIED)
-                         and (is_approver or mine), blocked_reason=blocked),
+                         and (is_approver or mine), is_approver=is_approver, blocked_reason=blocked),
         created_at=card.created_at)
 
 

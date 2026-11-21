@@ -242,6 +242,75 @@ function AdvanceBox({ deal, roomId, onChange }: { deal: Deal; roomId: string; on
   )
 }
 
+export function CounterpartyNotes({ notes }: { notes: string[] }) {
+  if (!notes.length) return null
+  return (
+    <section className="rounded-2xl border border-amber-300 bg-amber-50 p-3" aria-label="What your team remembers">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-amber-800">From your history · only your side sees this</h3>
+      <ul className="mt-1.5 space-y-1 text-sm text-amber-950">
+        {notes.map((n) => (
+          <li key={n}>• {n}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function OutcomeBox({ deal, roomId, onDeal }: { deal: Deal; roomId: string; onDeal: (d: Deal) => void }) {
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState<'won' | 'lost' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  if (deal.my_side !== 'provider') return null
+  if (deal.outcome) {
+    const o = deal.outcome
+    return (
+      <section className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+        <p>
+          Outcome: <strong>{o.outcome === 'won' ? 'Won' : 'Lost'}</strong>
+          {o.final_display && ` at ${o.final_display}`}
+          {o.first_ask_display && ` (first ask ${o.first_ask_display})`}
+        </p>
+        {o.note && <p className="mt-1 text-slate-500">{o.note}</p>}
+        <p className="mt-1 text-xs text-slate-500">Saved to your team's playbook for the next negotiation.</p>
+      </section>
+    )
+  }
+  async function save(outcome: 'won' | 'lost') {
+    setBusy(outcome)
+    setError(null)
+    try {
+      onDeal(await DealApi.outcome(roomId, outcome, note))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save the outcome')
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <section className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">How did it end?</h3>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={300}
+        placeholder="Optional note for next time"
+        aria-label="Outcome note"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <Button busy={busy === 'won'} disabled={deal.term_sheet.status !== 'locked'} onClick={() => void save('won')}>
+          Won
+        </Button>
+        <Button variant="secondary" busy={busy === 'lost'} onClick={() => void save('lost')}>
+          Lost
+        </Button>
+      </div>
+      {deal.term_sheet.status !== 'locked' && <p className="text-xs text-slate-500">A deal is won once both sides lock the terms.</p>}
+      <ErrorText>{error}</ErrorText>
+    </section>
+  )
+}
+
 export default function TermSheetPanel({ roomId, deal, onDeal, onClose, refreshKey }: {
   roomId: string
   deal: Deal
@@ -291,6 +360,7 @@ export default function TermSheetPanel({ roomId, deal, onDeal, onClose, refreshK
       </header>
       <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
         <ErrorText>{error}</ErrorText>
+        <CounterpartyNotes notes={deal.counterparty_notes} />
         {deal.proposals.length > 0 && (
           <section className="space-y-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scribe noticed in chat</h3>
@@ -341,6 +411,7 @@ export default function TermSheetPanel({ roomId, deal, onDeal, onClose, refreshK
         )}
         <SignBox deal={deal} roomId={roomId} onSigned={onDeal} />
         <AdvanceBox deal={deal} roomId={roomId} onChange={() => void reload()} />
+        <OutcomeBox deal={deal} roomId={roomId} onDeal={onDeal} />
         <p className="pb-4 text-center text-[11px] text-slate-400">{deal.disclaimer}</p>
       </div>
       {explain !== null && <ExplainSheet roomId={roomId} initial={explain} onClose={() => setExplain(null)} />}

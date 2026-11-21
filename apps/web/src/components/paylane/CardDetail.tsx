@@ -153,6 +153,8 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const payoutKey = useRef(newIdempotencyKey())
+  const [overrideReason, setOverrideReason] = useState('')
+  const [fraud, setFraud] = useState(false)
 
   useEffect(() => {
     PayApi.card(cardId).then(setCard).catch((e) => setError(e instanceof Error ? e.message : 'Not found'))
@@ -284,8 +286,26 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
             {card.viewer.can_verify && !card.verify_call && <VerifyCall card={card} onDone={update} />}
 
             <div className="grid gap-2">
+              {card.viewer.can_approve && card.risk_level === 'high' && (
+                <label className="block space-y-1 text-sm">
+                  <span className="font-medium text-ink">Why approve despite high risk?</span>
+                  <textarea
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    maxLength={300}
+                    rows={2}
+                    placeholder="e.g. Confirmed the new bank details with Ravi on the verify call"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-500">Kept with the card so the team can learn from overrides.</span>
+                </label>
+              )}
               {card.viewer.can_approve && (
-                <Button busy={busy === 'approve'} onClick={() => void run('approve', () => PayApi.approve(card.id, card.version))}>
+                <Button
+                  busy={busy === 'approve'}
+                  disabled={card.risk_level === 'high' && overrideReason.trim().length < 10}
+                  onClick={() => void run('approve', () => PayApi.approve(card.id, card.version, overrideReason.trim()))}
+                >
                   Approve {card.amount_display}
                 </Button>
               )}
@@ -294,9 +314,19 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
                   Pay {card.amount_display} (simulated)
                 </Button>
               )}
+              {card.viewer.can_reject && card.state !== 'unverified' && card.viewer.is_approver && (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={fraud} onChange={(e) => setFraud(e.target.checked)} className="size-4 accent-red-600" />
+                  Suspected fraud (Pakkaa tightens its risk checks)
+                </label>
+              )}
               {card.viewer.can_reject && (
-                <Button variant="secondary" busy={busy === 'reject'} onClick={() => void run('reject', () => PayApi.reject(card.id))}>
-                  {card.state === 'unverified' ? 'Dismiss draft' : 'Reject'}
+                <Button
+                  variant={fraud ? 'danger' : 'secondary'}
+                  busy={busy === 'reject'}
+                  onClick={() => void run('reject', () => PayApi.reject(card.id, '', fraud))}
+                >
+                  {card.state === 'unverified' ? 'Dismiss draft' : fraud ? 'Reject as fraud' : 'Reject'}
                 </Button>
               )}
             </div>

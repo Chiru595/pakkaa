@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import CopilotBar, { type Chosen } from '../components/deal/CopilotBar'
-import TermSheetPanel from '../components/deal/TermSheetPanel'
+import TermSheetPanel, { CounterpartyNotes } from '../components/deal/TermSheetPanel'
 import CardsPanel from '../components/paylane/CardsPanel'
 import IncomingCall from '../components/paylane/IncomingCall'
 import { Badge, Button, ErrorText, Screen, Spinner, VerifiedBadge } from '../components/ui'
@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth'
 import { type ChatLine, connectChat, loadHistory, mergeLines, onChatStatus, sendText, subscribe } from '../lib/chat'
 import { type Deal, DealApi, type PresendWarning } from '../lib/deal'
 
-const DEAL_CARD_KINDS = new Set(['scribe', 'term_update', 'signature', 'payment_link', 'payment_status'])
+const DEAL_CARD_KINDS = new Set(['scribe', 'term_update', 'signature', 'payment_link', 'payment_status', 'outcome', 'memory_warning'])
 
 function DealBar({ deal, onOpen }: { deal: Deal; onOpen: () => void }) {
   const ts = deal.term_sheet
@@ -285,6 +285,11 @@ export default function RoomPage() {
           )}
         </header>
         {isDeal && deal && <DealBar deal={deal} onOpen={() => setShowSheet(true)} />}
+        {isDeal && deal && deal.counterparty_notes.length > 0 && (
+          <div className="border-b border-amber-200 px-3 py-2">
+            <CounterpartyNotes notes={deal.counterparty_notes.slice(0, 2)} />
+          </div>
+        )}
         {isTeamLane && (
           <button
             type="button"
@@ -323,6 +328,13 @@ export default function RoomPage() {
                 >
                   💸 {l.text}
                 </button>
+              )
+            }
+            if (l.kind === 'card' && l.card?.kind === 'memory_warning') {
+              return (
+                <p key={l.id} role="note" className="mx-auto max-w-[90%] rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-xs text-amber-900">
+                  🔒 {l.text}
+                </p>
               )
             }
             if (l.kind === 'card') {

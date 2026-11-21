@@ -52,6 +52,7 @@ export interface Card {
     can_payout: boolean
     can_verify: boolean
     can_reject: boolean
+    is_approver: boolean
     blocked_reason: string | null
   }
   created_at: string
@@ -99,6 +100,45 @@ export interface AskAnswer {
   disclaimer: string
 }
 
+export interface Threshold {
+  key: string
+  label: string
+  value: number
+  default: number
+  lower_is_tighter: boolean
+  min: number
+  max: number
+}
+
+export interface PolicyChange {
+  key: string
+  from: number
+  to: number
+  direction: 'tighten' | 'loosen'
+  source: 'learning' | 'person'
+  reason: string
+  by: string | null
+  at: string
+}
+
+export interface Policy {
+  approval_bands: { up_to_rupees: number | null; approvals: number; owner_required: boolean }[]
+  source: string
+  as_of: string
+  disclaimer: string
+  thresholds: Threshold[]
+  changes: PolicyChange[]
+}
+
+export interface MemoryEntry {
+  id: string
+  kind: 'playbook' | 'correction' | 'counterparty' | 'preference' | 'payee' | 'risk_override'
+  visibility: 'team' | 'private'
+  text: string
+  source: string
+  created_at: string
+}
+
 export interface NewPayee {
   name: string
   method: 'upi' | 'bank'
@@ -121,8 +161,14 @@ export const PayApi = {
     api<Card>(`/api/rooms/${roomId}/cards`, post(body)),
   edit: (cardId: string, body: { amount_paise?: number; payee_id?: string; reason?: string }) =>
     api<Card>(`/api/cards/${cardId}`, json('PATCH', body)),
-  approve: (cardId: string, version: number) => api<Card>(`/api/cards/${cardId}/approve`, post({ version })),
-  reject: (cardId: string, note = '') => api<Card>(`/api/cards/${cardId}/reject`, post({ note })),
+  approve: (cardId: string, version: number, override_reason?: string) =>
+    api<Card>(`/api/cards/${cardId}/approve`, post({ version, override_reason: override_reason || undefined })),
+  reject: (cardId: string, note = '', suspected_fraud = false) =>
+    api<Card>(`/api/cards/${cardId}/reject`, post({ note, suspected_fraud })),
+  policy: (orgId: string) => api<Policy>(`/api/orgs/${orgId}/policy`),
+  setThreshold: (orgId: string, key: string, value: number, reason: string) =>
+    api<Policy>(`/api/orgs/${orgId}/policy/thresholds`, json('PUT', { key, value, reason })),
+  memory: (orgId: string) => api<MemoryEntry[]>(`/api/orgs/${orgId}/memory`),
   brief: (cardId: string) => api<Brief>(`/api/cards/${cardId}/brief`),
   startVerify: (cardId: string) => api<VerifyStart>(`/api/cards/${cardId}/verify-call`, post()),
   completeVerify: (cardId: string, callId: string, outcome: 'confirmed' | 'suspicious', notes: string, duration_s: number) =>

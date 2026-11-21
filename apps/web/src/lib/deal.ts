@@ -71,6 +71,16 @@ export interface Deal {
   proposals: Proposal[]
   advance_link: PaymentLink | null
   disclaimer: string
+  counterparty_notes: string[]
+  outcome: DealOutcome | null
+}
+
+export interface DealOutcome {
+  outcome: 'won' | 'lost'
+  first_ask_display: string | null
+  final_display: string | null
+  note: string | null
+  recorded_at: string
 }
 
 export interface Profile {
@@ -171,6 +181,8 @@ export const DealApi = {
   sign: (roomId: string, version: number, hash: string, code: string) =>
     api<Deal>(`/api/rooms/${roomId}/term-sheet/sign`, post({ version, hash, code })),
   advanceLink: (roomId: string) => api<PaymentLink>(`/api/rooms/${roomId}/advance-link`, post()),
+  outcome: (roomId: string, outcome: 'won' | 'lost', note: string) =>
+    api<Deal>(`/api/rooms/${roomId}/outcome`, post({ outcome, note: note.trim() || undefined })),
   payPage: (token: string) => api<PayPage>(`/api/pay/${token}`),
   simulatePay: (token: string, outcome: 'paid' | 'failed') => api<PayPage>(`/api/pay/${token}/simulate`, post({ outcome })),
 }

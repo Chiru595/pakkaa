@@ -4,6 +4,7 @@ import { parseRupees, rupees } from '../../lib/deal'
 import { type Card, type Control, type NewPayee, type ParsedDraft, PayApi, type Payee, STATE_LABEL } from '../../lib/paylane'
 import { Badge, Button, ErrorText, Field } from '../ui'
 import CardDetail from './CardDetail'
+import LearningPanel from './LearningPanel'
 
 const RISK_TONE = { low: 'green', medium: 'amber', high: 'red' } as const
 
@@ -191,7 +192,7 @@ export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }
   const [payees, setPayees] = useState<Payee[]>([])
   const [control, setControl] = useState<Control | null>(null)
   const [open, setOpen] = useState<string | null>(focusCardId)
-  const [tab, setTab] = useState<'cards' | 'payees'>('cards')
+  const [tab, setTab] = useState<'cards' | 'payees' | 'learning'>('cards')
   const [error, setError] = useState<string | null>(null)
   const canEditPayees = role === 'owner' || role === 'finance'
 
@@ -228,10 +229,10 @@ export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }
     <div className="absolute inset-0 z-20 flex flex-col bg-white" role="dialog" aria-label="Payment cards">
       <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex gap-1" role="tablist">
-          {(['cards', 'payees'] as const).map((t) => (
+          {(['cards', 'payees', 'learning'] as const).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
               className={`rounded-full px-3 py-1 text-sm ${tab === t ? 'bg-ink text-white' : 'text-slate-600'}`}>
-              {t === 'cards' ? 'Payments' : 'Payees'}
+              {t === 'cards' ? 'Payments' : t === 'payees' ? 'Payees' : 'Learning'}
             </button>
           ))}
         </div>
@@ -280,6 +281,8 @@ export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }
               </ul>
             )}
           </>
+        ) : tab === 'learning' ? (
+          <LearningPanel orgId={orgId} />
         ) : (
           <>
             <ul className="divide-y divide-slate-100">

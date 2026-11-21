@@ -94,12 +94,12 @@ milestone must meet these rules:
 
 ## M3 Memory and learning (45 min)
 
-- [ ] Signals: suggestion accepted, edited or ignored; Scribe corrections; deal outcomes; client payment
+- [x] Signals: suggestion accepted, edited or ignored; Scribe corrections; deal outcomes; client payment
       behaviour; payee amounts and timing; Warden overrides with reasons
-- [ ] Use: per-user suggestion ranking; corrections as few-shot examples; pgvector playbook retrieval;
+- [x] Use: per-user suggestion ranking; corrections as few-shot examples; pgvector playbook retrieval;
       counterparty warnings; payee baselines as anomaly thresholds
-- [ ] Learning only tightens thresholds; loosening needs an owner's logged change
-- [ ] Memory is isolated per org; copilot memory is private to its owner; every item keeps its source
+- [x] Learning only tightens thresholds; loosening needs an owner's logged change
+- [x] Memory is isolated per org; copilot memory is private to its owner; every item keeps its source
 
 ## M4 Safety and audit (30 min)
 

@@ -91,8 +91,16 @@ export default function CopilotBar({ roomId, side, trigger, warnings, onUse }: {
   const [open, setOpen] = useState(true)
   const [limits, setLimits] = useState(false)
   const abort = useRef<AbortController | null>(null)
+  const shown = useRef<{ id: string; used: boolean } | null>(null)
+
+  function markIgnored() {
+    const prev = shown.current
+    if (prev && !prev.used) void DealApi.feedback(roomId, prev.id, null, 'ignored').catch(() => undefined)
+    shown.current = null
+  }
 
   async function suggest(triggerId: string | null) {
+    markIgnored()
     abort.current?.abort()
     const ctrl = new AbortController()
     abort.current = ctrl
@@ -107,7 +115,11 @@ export default function CopilotBar({ roomId, side, trigger, warnings, onUse }: {
         triggerId,
         (event, data) => {
           if (event === 'option') setOptions((prev) => [...prev, data as ReplyOption])
-          else if (event === 'done') setSuggestionId((data as { suggestion_id: string }).suggestion_id)
+          else if (event === 'done') {
+            const id = (data as { suggestion_id: string }).suggestion_id
+            shown.current = { id, used: false }
+            setSuggestionId(id)
+          }
           else if (event === 'error') setError((data as { message: string }).message)
         },
         ctrl.signal,
@@ -171,7 +183,11 @@ export default function CopilotBar({ roomId, side, trigger, warnings, onUse }: {
             <button
               type="button"
               key={i}
-              onClick={() => suggestionId && onUse({ suggestionId, index: i, text: o.text })}
+              onClick={() => {
+                if (!suggestionId) return
+                if (shown.current?.id === suggestionId) shown.current.used = true
+                onUse({ suggestionId, index: i, text: o.text })
+              }}
               disabled={!suggestionId}
               className="rounded-xl border border-slate-200 px-3 py-2 text-left hover:border-brand disabled:opacity-80"
             >

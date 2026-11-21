@@ -50,16 +50,16 @@ def verify_webhook_signature(
 
 class NexconnClient:
     def __init__(self, app_key: str, app_secret: str, hosts: Sequence[str],
-                 http: httpx.AsyncClient | None = None) -> None:
+                 http: httpx.Client | None = None) -> None:
         if not app_key or not app_secret:
             raise ValueError("Nexconn App Key and App Secret are required")
         self._app_key = app_key
         self._app_secret = app_secret
         self._hosts = list(hosts)
-        self._http = http or httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS)
+        self._http = http or httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
 
-    async def aclose(self) -> None:
-        await self._http.aclose()
+    def close(self) -> None:
+        self._http.close()
 
     def _headers(self) -> dict[str, str]:
         nonce = secrets.token_hex(8)
@@ -72,11 +72,11 @@ class NexconnClient:
             "Content-Type": "application/json",
         }
 
-    async def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         last_error: Exception | None = None
         for host in self._hosts:
             try:
-                resp = await self._http.post(f"{host}{path}", json=body, headers=self._headers())
+                resp = self._http.post(f"{host}{path}", json=body, headers=self._headers())
             except httpx.TransportError as exc:
                 last_error = exc
                 log.warning("nexconn transport error", extra={"path": path, "host": host})
@@ -94,30 +94,30 @@ class NexconnClient:
             return data
         raise NexconnError(path, "unreachable", str(last_error))
 
-    async def issue_token(self, user_id: str, name: str, avatar_url: str | None = None) -> str:
+    def issue_token(self, user_id: str, name: str, avatar_url: str | None = None) -> str:
         body: dict[str, Any] = {"userId": user_id, "name": name[:64]}
         if avatar_url:
             body["avatarUrl"] = avatar_url
-        data = await self._post("/v4/auth/access-token/issue", body)
+        data = self._post("/v4/auth/access-token/issue", body)
         token = (data.get("result") or {}).get("accessToken")
         if not token:
             raise NexconnError("/v4/auth/access-token/issue", data.get("code"), "no accessToken in response")
         return token
 
-    async def expire_tokens(self, user_ids: Sequence[str], expires_at_ms: int) -> None:
-        await self._post("/v4/auth/access-token/expire", {"userIds": list(user_ids)[:20], "expiresAt": expires_at_ms})
+    def expire_tokens(self, user_ids: Sequence[str], expires_at_ms: int) -> None:
+        self._post("/v4/auth/access-token/expire", {"userIds": list(user_ids)[:20], "expiresAt": expires_at_ms})
 
-    async def create_group(self, channel_id: str, name: str, owner: str, user_ids: Sequence[str] = ()) -> None:
-        await self._post("/v4/group-channel/create",
+    def create_group(self, channel_id: str, name: str, owner: str, user_ids: Sequence[str] = ()) -> None:
+        self._post("/v4/group-channel/create",
                          {"channelId": channel_id, "name": name[:64], "owner": owner, "userIds": list(user_ids)[:30]})
 
-    async def join_group(self, channel_id: str, user_ids: Sequence[str]) -> None:
-        await self._post("/v4/group-channel/join", {"channelId": channel_id, "userIds": list(user_ids)[:100]})
+    def join_group(self, channel_id: str, user_ids: Sequence[str]) -> None:
+        self._post("/v4/group-channel/join", {"channelId": channel_id, "userIds": list(user_ids)[:100]})
 
-    async def leave_group(self, channel_id: str, user_ids: Sequence[str]) -> None:
-        await self._post("/v4/group-channel/leave", {"channelId": channel_id, "userIds": list(user_ids)[:100]})
+    def leave_group(self, channel_id: str, user_ids: Sequence[str]) -> None:
+        self._post("/v4/group-channel/leave", {"channelId": channel_id, "userIds": list(user_ids)[:100]})
 
-    async def send_group_message(
+    def send_group_message(
         self,
         from_user_id: str,
         channel_id: str,
@@ -140,12 +140,12 @@ class NexconnClient:
             body["toUserIds"] = list(to_user_ids)
         if push_content:
             body["pushContent"] = push_content
-        data = await self._post("/v4/group-channel/message/send", body)
+        data = self._post("/v4/group-channel/message/send", body)
         ids = (data.get("result") or {}).get("messageIds") or []
         return ids[0].get("messageId") if ids else None
 
-    async def send_card(self, from_user_id: str, channel_id: str, card: dict[str, Any],
+    def send_card(self, from_user_id: str, channel_id: str, card: dict[str, Any],
                         to_user_ids: Sequence[str] | None = None) -> str | None:
-        return await self.send_group_message(
+        return self.send_group_message(
             from_user_id, channel_id, CARD_MESSAGE_TYPE, card, to_user_ids=to_user_ids,
             push_content=str(card.get("title") or "New card"))

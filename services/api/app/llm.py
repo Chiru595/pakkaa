@@ -43,7 +43,7 @@ class Lane(StrEnum):
 
 
 LANE_TIMEOUT_SECONDS = {Lane.FAST: 8.0, Lane.LIVE: 15.0, Lane.SMART: 30.0, Lane.DEEP: 60.0}
-LANE_REASONING = {Lane.FAST: "none", Lane.LIVE: "low", Lane.SMART: "low", Lane.DEEP: "medium"}
+LANE_REASONING = {Lane.FAST: "none", Lane.LIVE: "none", Lane.SMART: "low", Lane.DEEP: "medium"}
 
 
 class LLMUnavailable(RuntimeError):

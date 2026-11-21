@@ -56,21 +56,21 @@ function LimitsForm({ roomId, side, onClose }: { roomId: string; side: string; o
       <label className="block text-sm">
         {walkLabel}
         <input value={walkAway} onChange={(e) => setWalkAway(e.target.value)} inputMode="decimal" placeholder="45000"
-          maxLength={14} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+          maxLength={14} disabled={!profile} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
       </label>
       <label className="block text-sm">
         Target price
         <input value={target} onChange={(e) => setTarget(e.target.value)} inputMode="decimal" placeholder="55000"
-          maxLength={14} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+          maxLength={14} disabled={!profile} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
       </label>
       <label className="block text-sm">
         Private notes
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2}
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} disabled={!profile}
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
       </label>
       <ErrorText>{error}</ErrorText>
       <div className="flex gap-2">
-        <Button type="submit" busy={busy} className="px-3 py-1.5">Save</Button>
+        <Button type="submit" busy={busy} disabled={!profile} className="px-3 py-1.5">Save</Button>
         <Button type="button" variant="ghost" className="px-3 py-1.5" onClick={onClose}>Cancel</Button>
       </div>
     </form>

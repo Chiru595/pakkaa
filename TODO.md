@@ -58,21 +58,21 @@ milestone must meet these rules:
 
 ## M1 Deal Room with live AI (2 h)
 
-- [ ] `llm.py`: one OpenAI wrapper (model per lane from env: fast, live, smart, deep) with timeouts, retries with backoff, streaming, pydantic validation of
+- [x] `llm.py`: one OpenAI wrapper (model per lane from env: fast, live, smart, deep) with timeouts, retries with backoff, streaming, pydantic validation of
       all JSON output, per-call token and latency logging, and a circuit breaker that degrades gracefully (P)
-- [ ] Untrusted-content wrapper: chat text goes into prompts as delimited data, never as instructions
-- [ ] Term sheet card pinned in the room; versioned
-- [ ] Scribe: proposed term updates with `source_message_id` and confidence; a human confirms each one
-- [ ] Private copilot panel: 2-3 streamed reply options with tactic label and one-line why; target under 3 s
-- [ ] Pre-send check against the sender's private floor and the term sheet: warns, never blocks
-- [ ] Fair-price meter from Ledger rate bands (rule pack with `source` and `as_of`) and this client's past deals
-- [ ] Clause explainer in English, Hindi or Hinglish, with "standard or not"
-- [ ] Lock review: missing or risky terms before lock
-- [ ] Lock and sign: OTP from both parties; version plus SHA-256 of the canonical JSON; any later change
+- [x] Untrusted-content wrapper: chat text goes into prompts as delimited data, never as instructions
+- [x] Term sheet card pinned in the room; versioned
+- [x] Scribe: proposed term updates with `source_message_id` and confidence; a human confirms each one
+- [x] Private copilot panel: 2-3 streamed reply options with tactic label and one-line why; target under 3 s
+- [x] Pre-send check against the sender's private floor and the term sheet: warns, never blocks
+- [x] Fair-price meter from Ledger rate bands (rule pack with `source` and `as_of`) and this client's past deals
+- [x] Clause explainer in English, Hindi or Hinglish, with "standard or not"
+- [x] Lock review: missing or risky terms before lock
+- [x] Lock and sign: OTP from both parties; version plus SHA-256 of the canonical JSON; any later change
       needs both again
-- [ ] Advance payment link through `SimulatedProvider` (hosted pay page, then paid or failed status)
-- [ ] Card updates only from provider status, never from chat text (P)
-- [ ] Ledger: rule packs with `source` and `as_of`, statutory interest, number fact-check for AI text
+- [x] Advance payment link through `SimulatedProvider` (hosted pay page, then paid or failed status)
+- [x] Card updates only from provider status, never from chat text (P)
+- [x] Ledger: rule packs with `source` and `as_of`, statutory interest, number fact-check for AI text
 
 ## M2 Pay Lane with live AI (2 h)
 

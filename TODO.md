@@ -120,12 +120,14 @@ milestone must meet these rules:
 
 ## M5 Demo polish (remaining time)
 
-- [ ] Seed: Acme Studio, owner, finance, freelancer, client guest, two vendors, past deals and payments
-- [ ] Demo mode toggle with the scripted 3-minute run
-- [ ] Two-phone UI polish; loading, empty and error states; keyboard and screen-reader basics (P)
+- [x] Seed: Acme Studio, owner, finance, freelancer, client guest, two vendors, past deals and payments
+      (`scripts/seed_demo.py`, idempotent, `--allow-remote` guard); production seeded
+- [x] Demo mode toggle with the scripted 3-minute run (Demo guide, demo account chips on login)
+- [x] Two-phone UI polish; loading, empty and error states; keyboard and screen-reader basics (P)
 - [ ] Privacy policy, terms and grievance contact pages (DPDP) (P)
-- [ ] README: setup, architecture diagram, screenshots, "not legal or financial advice"
-- [ ] Run the demo script end to end twice on the deployed URL without errors
+- [x] README: setup, architecture, screenshots, demo accounts, "not legal or financial advice"
+- [x] Run the demo script end to end twice on the deployed URL without errors (verify call degrades until
+      Nexconn calling is enabled)
 
 ## Sunday (P1, for the Nexconn submission, due 22 Nov 2026 23:59 AoE)
 

@@ -1,10 +1,57 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
+import CopilotBar, { type Chosen } from '../components/deal/CopilotBar'
+import TermSheetPanel from '../components/deal/TermSheetPanel'
 import { Badge, Button, ErrorText, Screen, Spinner, VerifiedBadge } from '../components/ui'
 import { Api, ROLE_LABEL, type Room, TEAM_ROLES } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { type ChatLine, connectChat, loadHistory, mergeLines, onChatStatus, sendText, subscribe } from '../lib/chat'
+import { type Deal, DealApi, type PresendWarning } from '../lib/deal'
+
+const DEAL_CARD_KINDS = new Set(['scribe', 'term_update', 'signature', 'payment_link', 'payment_status'])
+
+function DealBar({ deal, onOpen }: { deal: Deal; onOpen: () => void }) {
+  const ts = deal.term_sheet
+  const val = (k: string) => ts.terms.find((t) => t.key === k)
+  const price = val('price_paise')
+  const adv = val('advance_pct')
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-2 border-b border-slate-100 bg-emerald-50/60 px-4 py-2 text-left text-sm"
+    >
+      <span aria-hidden>📄</span>
+      <span className="min-w-0 flex-1 truncate">
+        <span className="font-semibold text-ink">Term sheet v{ts.version}</span>
+        <span className="text-slate-600">
+          {price?.value != null ? ` · ${price.display}` : ''}
+          {adv?.value != null ? ` · ${adv.display} advance` : ''}
+        </span>
+      </span>
+      {deal.proposals.length > 0 && <Badge tone="amber">{deal.proposals.length} to confirm</Badge>}
+      <Badge tone={ts.status === 'locked' ? 'green' : 'slate'}>{ts.status === 'locked' ? 'Locked' : 'Draft'}</Badge>
+    </button>
+  )
+}
+
+function PaymentCard({ line }: { line: ChatLine }) {
+  const c = line.card ?? {}
+  return (
+    <div className="mx-auto w-full max-w-[85%] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-ink">{line.text}</p>
+        {Boolean(c.simulated) && <Badge tone="amber">Simulated</Badge>}
+      </div>
+      {typeof c.url === 'string' && (
+        <a href={c.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-semibold text-brand underline">
+          Open payment link
+        </a>
+      )}
+    </div>
+  )
+}
 
 function timeLabel(ms: number): string {
   const d = new Date(ms)
@@ -96,7 +143,28 @@ export default function RoomPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showMembers, setShowMembers] = useState(false)
+  const [deal, setDeal] = useState<Deal | null>(null)
+  const [showSheet, setShowSheet] = useState(false)
+  const [dealRefresh, setDealRefresh] = useState(0)
+  const [trigger, setTrigger] = useState<{ id: string; at: number } | null>(null)
+  const [warnings, setWarnings] = useState<PresendWarning[]>([])
+  const [chosen, setChosen] = useState<Chosen | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const myChatId = user ? `u${user.id}` : ''
+  const myChatIdRef = useRef(myChatId)
+  useEffect(() => {
+    myChatIdRef.current = myChatId
+  }, [myChatId])
+  const isDeal = room?.type === 'deal' && (room.my_side === 'provider' || room.my_side === 'client')
+
+  const reloadDeal = useCallback(async () => {
+    try {
+      setDeal(await DealApi.get(roomId))
+      setDealRefresh((n) => n + 1)
+    } catch {
+      /* the panel keeps its last state */
+    }
+  }, [roomId])
 
   useEffect(() => {
     let cancelled = false
@@ -112,7 +180,15 @@ export default function RoomPage() {
           if (incoming.some((l) => l.kind === 'card' && l.card?.kind === 'system')) {
             Api.room(roomId).then((fresh) => !cancelled && setRoom(fresh)).catch(() => undefined)
           }
+          if (r.type === 'deal' && incoming.some((l) => l.kind === 'card' && DEAL_CARD_KINDS.has(String(l.card?.kind)))) {
+            void reloadDeal()
+          }
+          const theirs = incoming.filter((l) => l.kind === 'text' && l.sender !== myChatIdRef.current)
+          if (r.type === 'deal' && theirs.length) setTrigger({ id: theirs[theirs.length - 1].id, at: Date.now() })
         })
+        if (r.type === 'deal' && (r.my_side === 'provider' || r.my_side === 'client')) {
+          DealApi.get(r.id).then((d) => !cancelled && setDeal(d)).catch(() => undefined)
+        }
         await connectChat()
         if (cancelled) return
         setConnected(true)
@@ -128,11 +204,24 @@ export default function RoomPage() {
       unsubscribe?.()
       offStatus()
     }
-  }, [roomId])
+  }, [roomId, reloadDeal])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [lines])
+
+  useEffect(() => {
+    if (!isDeal) return
+    const text = draft.trim()
+    const id = setTimeout(
+      () => {
+        if (text.length < 3) setWarnings([])
+        else DealApi.check(roomId, text).then(setWarnings).catch(() => setWarnings([]))
+      },
+      text.length < 3 ? 0 : 400,
+    )
+    return () => clearTimeout(id)
+  }, [draft, isDeal, roomId])
 
   async function send(e: FormEvent) {
     e.preventDefault()
@@ -143,6 +232,12 @@ export default function RoomPage() {
     try {
       const line = await sendText(room.id, text)
       setLines((prev) => mergeLines(prev, [line]))
+      setWarnings([])
+      if (chosen) {
+        const outcome = text === chosen.text ? 'sent' : 'edited'
+        void DealApi.feedback(room.id, chosen.suggestionId, chosen.index, outcome).catch(() => undefined)
+        setChosen(null)
+      }
     } catch (err) {
       setDraft(text)
       setError(err instanceof Error ? err.message : 'Message not sent')
@@ -152,7 +247,7 @@ export default function RoomPage() {
   }
 
   const names = new Map(room?.members.map((m) => [`u${m.user_id}`, m]) ?? [])
-  const mine = user ? `u${user.id}` : ''
+  const mine = myChatId
 
   return (
     <Screen>
@@ -175,6 +270,7 @@ export default function RoomPage() {
             </Button>
           )}
         </header>
+        {isDeal && deal && <DealBar deal={deal} onOpen={() => setShowSheet(true)} />}
 
         <section className="flex-1 space-y-2 overflow-y-auto bg-slate-50 px-3 py-4" aria-live="polite">
           {!room && !error && (
@@ -183,6 +279,9 @@ export default function RoomPage() {
             </div>
           )}
           {lines.map((l) => {
+            if (l.kind === 'card' && (l.card?.kind === 'payment_link' || l.card?.kind === 'payment_status')) {
+              return <PaymentCard key={l.id} line={l} />
+            }
             if (l.kind === 'card') {
               return (
                 <p key={l.id} className="mx-auto w-fit rounded-full bg-white px-3 py-1 text-center text-xs text-slate-500 shadow-sm">
@@ -222,6 +321,18 @@ export default function RoomPage() {
             <ErrorText>{error}</ErrorText>
           </div>
         )}
+        {isDeal && room?.my_side && (
+          <CopilotBar
+            roomId={roomId}
+            side={room.my_side}
+            trigger={trigger}
+            warnings={warnings}
+            onUse={(c) => {
+              setChosen(c)
+              setDraft(c.text)
+            }}
+          />
+        )}
         <form onSubmit={send} className="flex gap-2 border-t border-slate-100 bg-white p-3">
           <input
             value={draft}
@@ -237,6 +348,15 @@ export default function RoomPage() {
           </Button>
         </form>
         {showMembers && room && <MembersSheet room={room} onClose={() => setShowMembers(false)} />}
+        {showSheet && deal && (
+          <TermSheetPanel
+            roomId={roomId}
+            deal={deal}
+            onDeal={setDeal}
+            onClose={() => setShowSheet(false)}
+            refreshKey={dealRefresh}
+          />
+        )}
       </div>
     </Screen>
   )

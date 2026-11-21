@@ -132,7 +132,46 @@ export async function api<T>(path: string, init: RequestInit = {}, retry = true)
   return (await res.json()) as T
 }
 
-const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
+/** POSTs and reads a server-sent event stream, calling `onEvent` for each event as it arrives. */
+export async function streamEvents(
+  path: string,
+  body: unknown,
+  onEvent: (event: string, data: unknown) => void,
+  signal?: AbortSignal,
+  retry = true,
+): Promise<void> {
+  const headers = new Headers({ 'Content-Type': 'application/json', Accept: 'text/event-stream' })
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body), credentials: 'same-origin', signal })
+  if (res.status === 401 && retry && (await tryRefresh())) return streamEvents(path, body, onEvent, signal, false)
+  if (!res.ok || !res.body) throw await parseError(res)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let idx
+    while ((idx = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      let event = 'message'
+      let data = ''
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event: ')) event = line.slice(7)
+        else if (line.startsWith('data: ')) data += line.slice(6)
+      }
+      try {
+        onEvent(event, data ? JSON.parse(data) : null)
+      } catch {
+        /* ignore malformed event */
+      }
+    }
+  }
+}
+
+export const post = (body?: unknown): RequestInit => ({ method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 
 export const Api = {
   requestOtp: (phone: string) => api<OtpRequested>('/api/auth/otp/request', post({ phone })),

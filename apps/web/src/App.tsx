@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import Home from './pages/Home'
 import JoinPage from './pages/JoinPage'
 import Login from './pages/Login'
+import PayPage from './pages/PayPage'
 import Privacy from './pages/Privacy'
 import RoomPage from './pages/RoomPage'
 
@@ -28,6 +29,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/pay/:token" element={<PayPage />} />
           <Route path="/join/:token" element={<JoinPage />} />
           <Route path="/rooms/:roomId" element={<Gate><RoomPage /></Gate>} />
           <Route path="/" element={<Gate><Home /></Gate>} />

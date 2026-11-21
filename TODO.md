@@ -129,13 +129,12 @@ milestone must meet these rules:
 - [x] Run the demo script end to end twice on the deployed URL without errors (verify call degrades until
       Nexconn calling is enabled)
 
-## Sunday (P1, for the Nexconn submission, due 22 Nov 2026 23:59 AoE)
+## Next features
 
 - [ ] Scope guard (change-order cards), milestones and invoices, promise tracker
 - [ ] Chase-or-wait debate, cool-off timer, bank-change protocol
 - [ ] Deal-linked reference amount on Pay Lane cards; live call captions into the term sheet
 - [ ] WhatsApp or Slack chat import; dispute pack export
-- [ ] Submission: live link, public repo, demo video, write-up, App Key, prior-work disclosure
 
 ## After the hackathon (needed before real money moves)
 

@@ -9,10 +9,9 @@ OPTIONS = [
 
 def _profiles(client, owner, guest, room):
     url = f"/api/rooms/{room['id']}/copilot/profile"
-    client.put(url, json={"walk_away_paise": 4_500_000, "notes": "FREELANCER-SECRET rent due"},
-               headers=owner["headers"])
-    client.put(url, json={"walk_away_paise": 5_500_000, "notes": "CLIENT-SECRET board approved 55k"},
-               headers=guest["headers"])
+    r = client.put(url, json={"walk_away_paise": 4_500_000, "notes": "FREELANCER-SECRET rent due"},
+                   headers=owner["headers"])
+    assert r.status_code == 200
 
 
 def test_copilot_streams_options_and_records_suggestion(client, login_as, llm):
@@ -27,7 +26,7 @@ def test_copilot_streams_options_and_records_suggestion(client, login_as, llm):
     sid = events[-1].split('"suggestion_id": "')[1].split('"')[0]
     url = f"/api/rooms/{room['id']}/copilot/suggestions/{sid}/feedback"
     assert client.post(url, json={"chosen_index": 1, "outcome": "edited"}, headers=owner["headers"]).status_code == 204
-    assert client.post(url, json={"chosen_index": 1, "outcome": "sent"}, headers=guest["headers"]).status_code == 404
+    assert client.post(url, json={"chosen_index": 1, "outcome": "sent"}, headers=guest["headers"]).status_code == 403
 
 
 def test_copilot_offline_degrades_gracefully(client, login_as, llm):
@@ -37,18 +36,20 @@ def test_copilot_offline_degrades_gracefully(client, login_as, llm):
     assert r.status_code == 200 and "event: error" in r.text and "offline" in r.text
 
 
-def test_client_copilot_context_has_no_freelancer_side_data(client, login_as, llm):
+def test_copilot_is_only_for_the_freelancer_side(client, login_as, llm):
     owner, guest, _, room = setup_deal(client, login_as)
     _profiles(client, owner, guest, room)
-    say(client, owner, room, "Full kit is 60k.")
-    llm.queue("copilot", OPTIONS, OPTIONS)
-    client.post(f"/api/rooms/{room['id']}/copilot/suggest", json={}, headers=guest["headers"])
-    client.post(f"/api/rooms/{room['id']}/copilot/suggest", json={}, headers=owner["headers"])
-    guest_ctx, owner_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"]
-    assert "CLIENT-SECRET" in guest_ctx and "₹55,000" in guest_ctx
-    assert "FREELANCER-SECRET" not in guest_ctx and "₹45,000" not in guest_ctx
-    assert "FREELANCER-SECRET" in owner_ctx and "CLIENT-SECRET" not in owner_ctx and "₹55,000" not in owner_ctx
-    assert "untrusted_data" in guest_ctx
+    say(client, guest, room, "Can we do 50k?")
+    base = f"/api/rooms/{room['id']}/copilot"
+    assert client.post(f"{base}/suggest", json={}, headers=guest["headers"]).status_code == 403
+    assert client.get(f"{base}/profile", headers=guest["headers"]).status_code == 403
+    r = client.put(f"{base}/profile", json={"walk_away_paise": 5_500_000, "notes": "CLIENT"}, headers=guest["headers"])
+    assert r.status_code == 403
+    assert not [c for c in llm.calls if c["purpose"] == "copilot"], "no model call is made for the client"
+    llm.queue("copilot", OPTIONS)
+    assert client.post(f"{base}/suggest", json={}, headers=owner["headers"]).status_code == 200
+    owner_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"][0]
+    assert "FREELANCER-SECRET" in owner_ctx and "untrusted_data" in owner_ctx
 
 
 def test_presend_warns_but_never_blocks(client, login_as):
@@ -58,7 +59,7 @@ def test_presend_warns_but_never_blocks(client, login_as):
     codes = lambda who, text: {w["code"] for w in client.post(url, json={"draft": text}, headers=who["headers"]).json()}  # noqa: E731
     assert "below_walk_away" in codes(owner, "Okay, 40k final")
     assert codes(owner, "Okay, 50k final") == set()
-    assert "above_budget" in codes(guest, "We can stretch to 60k")
+    assert codes(guest, "We can stretch to 60k") == set()
     assert {"no_advance", "unlimited_revisions"} <= codes(owner, "No advance needed, unlimited revisions")
     assert "secret" in codes(guest, "my OTP is 482913")
     say(client, owner, room, "Okay, 40k final")

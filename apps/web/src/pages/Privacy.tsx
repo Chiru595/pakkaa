@@ -24,7 +24,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
     title: 'Who can see it',
     body: [
       'People in a room see that room only. Guests never see a team’s other rooms.',
-      'Your AI copilot, private floor price and notes are visible only to you.',
+      'The AI copilot, private floor price and notes are visible only to their owner on the freelancer side.',
       'Bank and UPI details are encrypted at rest and shown masked to the last 4 characters.',
       'Chat is delivered through Nexconn, our messaging provider. We do not sell your data.',
     ],

@@ -33,8 +33,8 @@
 | Rooms and chat | Each room is a Nexconn group; messages go through our API, are stored, then delivered live by Nexconn | Nexconn server API (signed requests) + Web Chat SDK `@nexconn/chat` |
 | Cards in chat | Term sheets, payment cards and notices are a custom Nexconn message type `PK:Card` posted by the Pakkaa bot; private notices use directed messages only one person receives | Nexconn custom message type, directed messages |
 | Guest invites | Single-use links that expire in 72 hours; the token is stored only as an HMAC; the guest verifies their phone before joining | HMAC-SHA256, Postgres |
-| Private copilot | Builds context only from what its owner can see, then streams three reply options with tactic and reason as they are generated | OpenAI `gpt-6.1-terra` (no reasoning, ~1 s to first token), Server-Sent Events, pydantic |
-| Pre-send check | Compares amounts in your draft with your walk-away price and the term sheet; spots "no advance", "unlimited revisions", OTPs and bank details | Pure Python rules and regex (no AI), runs 0.4 s after you stop typing |
+| Private copilot (freelancer side only) | Builds context only from what the freelancer can see, then streams three reply options with tactic and reason as they are generated; clients get a 403 and no model call is made for them | OpenAI `gpt-6.1-terra` (no reasoning, ~1 s to first token), Server-Sent Events, pydantic |
+| Pre-send check | Freelancer: compares amounts with the walk-away price and the term sheet, spots "no advance" and "unlimited revisions". Both sides: warns before sharing OTPs, PINs or bank details in chat | Pure Python rules and regex (no AI), runs 0.4 s after you stop typing |
 | Scribe | After each message, proposes term updates with the quote they came from and a confidence; a person confirms each one; past corrections are fed back as examples | OpenAI `gpt-6.2-sol`, pydantic schema, FastAPI background task |
 | Fair-price meter | Your own past locked deals first; otherwise an indicative rate band for the category, shown with its source and date | Python, YAML rule pack with `source` and `as_of` |
 | Clause explainer | Plain-language meaning in English, Hindi or Hinglish, and whether the clause is standard | OpenAI `gpt-6.2-sol`, pydantic |
@@ -88,8 +88,8 @@ tactic you pick most often moves to the top. The pre-send check and the risk eng
 work fully from the first message.
 
 Pakkaa deliberately does not research the client outside the workspace: scraping someone's network without
-consent would conflict with India's Digital Personal Data Protection Act and with the promise that each side's
-copilot sees only its own side. A natural next step is opt-in, public-register checks such as GSTIN status.
+consent would conflict with India's Digital Personal Data Protection Act and with the promise that the copilot
+sees only its owner's side. A natural next step is opt-in, public-register checks such as GSTIN status.
 
 ## Message path
 

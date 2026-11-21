@@ -9,8 +9,8 @@ are agreed in chat and payment instructions arrive in chat, but no tool in that 
 does: it turns what people agree into a signed term sheet, and turns every payment request into a verified,
 risk-checked card that a chat message can never execute.
 
-- **Deal Room (money in):** freelancer and client negotiate in one room, each with a private AI copilot. Agreed
-  terms fill a live term sheet, both sides sign it with OTP, and the advance is requested through a payment link.
+- **Deal Room (money in):** freelancer and client negotiate in one room. The freelancer gets a private AI copilot;
+  the client gets a clear term sheet to sign with OTP and a verified payment link for the advance.
 - **Pay Lane (money out):** the team's only valid channel for outgoing payments. Payment cards come only from
   verified people, are risk-checked, re-confirmed by the requester with an OTP when risky, approved by two people,
   then paid.
@@ -36,7 +36,7 @@ on severity, frequency and market size) ranks this at the top of B2B services [1
 
 | Fix My Itch problem (exact wording) | Itch score | What Pakkaa does |
 |---|---|---|
-| Why can't SMEs negotiate favorable payment terms with large buyers? | **82.8** (highest in B2B Services) | A private copilot per side, a fair-price meter and a term sheet both sides sign |
+| Why can't SMEs negotiate favorable payment terms with large buyers? | **82.8** (highest in B2B Services) | A private negotiation copilot, a fair-price meter and a term sheet both sides sign |
 | Why do freelancers ghost projects after partial payments without accountability systems? | **76** | Every agreed term is signed with OTP and kept with the chat message it came from |
 | Why can't businesses verify new suppliers before purchasing? | **76** | Payees are checked and scored before any money moves |
 | Why do micro-SMEs waste 10+ hours weekly on invoice management? | **67.5** | Terms, advance link and payment status live in one room |
@@ -85,7 +85,7 @@ risk-checked cards that chat text can never execute.
 
 | | Feature | The problem it answers |
 |---|---|---|
-| 1 | **Two private copilots in one room.** Each side gets three live reply options with a tactic (hold price, trade scope, ask a question) and a one-line why. Neither copilot ever sees the other side's limits, notes or suggestions. | Small sellers negotiating alone against bigger buyers (Fix My Itch 82.8) |
+| 1 | **A private negotiation copilot for the freelancer.** Three live reply options with a tactic (hold price, trade scope, ask a question) and a one-line why, using the freelancer's private walk-away price and past deals. The client never sees it; the client gets the signed term sheet and a verified payment link. | Small sellers negotiating alone against bigger buyers (Fix My Itch 82.8) |
 | 2 | **Chat becomes a signed term sheet.** The Scribe reads the chat and proposes price, advance, timeline and revisions, quoting the message each came from; a person confirms each one. Both sides sign the exact version with an OTP and a SHA-256 fingerprint; any later change needs both again. A pre-send check warns before you reply below your walk-away price. | Deals agreed in chat, then disputed or ghosted (Fix My Itch 76) |
 | 3 | **Pakkaa remembers who pays late.** When a known client joins a new deal, only your side sees a heads-up such as "paid the last advance 15 days late". A fair-price meter compares the offer with your own past deals. | Late payment, ₹33,005 crore stuck in MSME delayed-payment cases |
 | 4 | **Chat can never move money.** A payment instruction typed in chat becomes an unverified draft that can never be approved or paid. Payments start only as cards raised by verified team members, and a lookalike account using the owner's name is flagged. | The "fake boss on WhatsApp" fraud (₹10.4 crore, Mumbai, June 2026) |
@@ -109,8 +109,8 @@ Screens from a real two-phone run of the demo script (demo mode, simulated payme
 <img src="docs/screenshots/03-private-heads-up.png" width="440"><br>
 *Ravi joins. Asha privately sees that he paid the last advance late; Ravi never sees it.*
 
-<img src="docs/screenshots/04-private-copilots.png" width="440"><br>
-*Each side gets its own copilot with different reply options; neither sees the other's.*
+<img src="docs/screenshots/04-freelancer-copilot.png" width="440"><br>
+*Asha's private copilot suggests replies; Ravi sees the same chat and the shared term sheet, never her copilot.*
 
 | Pre-send check warns below the walk-away price | Scribe turns chat into terms a person confirms |
 |---|---|
@@ -151,8 +151,8 @@ Screens from a real two-phone run of the demo script (demo mode, simulated payme
 **Deal Room**
 - Term sheet card pinned in the room; every term keeps the chat message it came from.
 - Scribe reads each message and proposes terms with a quote and confidence; a person confirms each one.
-- Private copilot per person: three streamed reply options with a tactic and a one-line why. It sees only its
-  owner's side (the other side's limits, notes and suggestions never enter its context).
+- Private copilot for the freelancer's side: three streamed reply options with a tactic and a one-line why. The
+  client never sees it and has no copilot; the client gets the term sheet card, OTP signing and a verified payment link.
 - Pre-send check against your walk-away price and the term sheet: it warns, never blocks.
 - Fair-price meter from your own past deals, then an indicative rate band labelled with its source and date.
 - Clause explainer in English, Hindi or Hinglish; lock review lists missing or risky terms.
@@ -223,7 +223,7 @@ one-time code appears on screen.
 | 98765 01009 | "Asha Rao" | Impostor vendor using the owner's name |
 
 1. **Deal Room:** Asha creates a deal and invites Ravi; when he joins, only Asha sees that Ravi paid the last
-   advance 15 days late. Both copilots suggest different replies; the pre-send check warns below the walk-away;
+   advance 15 days late. Asha's copilot suggests replies; the pre-send check warns below her walk-away;
    the Scribe fills the term sheet; both sign with OTP; Ravi pays the advance (simulated).
 2. **Pay Lane:** the impostor's "urgent, confidential" transfer becomes an unverified draft at risk 100. Asha's
    card for Kabir is high risk (bank details changed), so Asha confirms it with an OTP; Farah reads the approver
@@ -296,7 +296,7 @@ npx tsc -b
 112 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
 set `TEST_DATABASE_URL`), with every model request mocked. They include the red-team cases: impostor payouts, chat
 commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required),
-copilot privacy between sides, double payouts, audit tampering, cross-org access, payouts while frozen, and learning
+copilot only for the freelancer's side, double payouts, audit tampering, cross-org access, payouts while frozen, and learning
 never loosening.
 
 ## Limitations

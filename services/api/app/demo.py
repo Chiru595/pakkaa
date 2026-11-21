@@ -45,7 +45,7 @@ SCRIPT = [
     Step("Deal Room on two phones", "Phone A: Asha · Phone B: Ravi", (
         "Asha: + Deal Room “Brand refresh for Ravi Foods”, then People → Invite your client.",
         "Ravi opens the link on phone B and joins. Asha privately sees: Ravi paid the last advance 15 days late.",
-        "Asha: Limits → walk-away ₹50,000. Ravi: “Can you do it for ₹40,000?” Both get different copilot options.",
+        "Asha: Limits → walk-away ₹50,000. Ravi: “Can you do it for ₹40,000?” Asha's private copilot suggests replies.",
         "Asha types “OK, ₹40,000 works” and the pre-send check warns it is below her walk-away.",
         "Agree: “₹55,000, 40% advance, 3 weeks, 3 revisions”. Confirm the Scribe's terms; open the fair-price meter.",
         "Both sign with OTP, the sheet locks, Asha requests the advance and Ravi pays (simulated).",

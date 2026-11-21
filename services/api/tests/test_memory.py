@@ -50,10 +50,10 @@ def test_late_advance_warns_the_team_on_the_next_deal_only(client, login_as, sen
     say(client, guest, second, "Shall we start?")
     llm.queue("copilot", OPTIONS, OPTIONS)
     client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=owner["headers"])
-    client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=guest["headers"])
-    owner_ctx, guest_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"]
+    r = client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=guest["headers"])
+    assert r.status_code == 403
+    owner_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"][0]
     assert "15 days late" in owner_ctx
-    assert "15 days late" not in guest_ctx and "counterparty" not in guest_ctx
 
 
 def test_deal_outcome_becomes_team_playbook_not_client_memory(client, login_as, sent_codes, db, llm):
@@ -76,9 +76,11 @@ def test_deal_outcome_becomes_team_playbook_not_client_memory(client, login_as, 
     say(client, guest, second, "What would a website cost?")
     llm.queue("copilot", OPTIONS, OPTIONS)
     client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=owner["headers"])
-    client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=guest["headers"])
-    owner_ctx, guest_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"]
-    assert "was won" in owner_ctx and "was won" not in guest_ctx
+    r = client.post(f"/api/rooms/{second['id']}/copilot/suggest", json={}, headers=guest["headers"])
+    assert r.status_code == 403
+    owner_ctx = [c["data"] for c in llm.calls if c["purpose"] == "copilot"][0]
+    assert "was won" in owner_ctx
+    assert deal(client, guest, second)["counterparty_notes"] == []
 
 
 def test_memory_works_without_embeddings(client, login_as, sent_codes, db, llm):

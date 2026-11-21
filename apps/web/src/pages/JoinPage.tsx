@@ -65,7 +65,7 @@ export default function JoinPage() {
         <ul className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
           <li>You will see only this room, never their other deals.</li>
           <li>Everyone in the room sees your name and the last 4 digits of your verified phone.</li>
-          <li>Your AI copilot is private to you; the other side never sees it.</li>
+          <li>What you agree becomes a term sheet you both sign with an OTP, and you pay through a verified link.</li>
         </ul>
         <ErrorText>{error}</ErrorText>
         <Button onClick={() => void accept()} busy={busy}>

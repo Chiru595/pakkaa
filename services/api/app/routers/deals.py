@@ -304,6 +304,8 @@ def decide(room_id: str, proposal_id: str, decision: str, user: User = Depends(c
 @router.get("/{room_id}/copilot/profile", response_model=ProfileOut)
 def get_profile(room_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)) -> ProfileOut:
     room, member = _context(db, user, room_id)
+    if member.side != "provider":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Private limits are for the freelancer's side of the deal")
     p = db.get(CopilotProfile, (room.id, user.id))
     return ProfileOut(side=member.side, walk_away_paise=p.walk_away_paise if p else None,
                       target_paise=p.target_paise if p else None, notes=p.notes if p else None)
@@ -314,6 +316,8 @@ def get_profile(room_id: str, user: User = Depends(current_user), db: Session = 
 def put_profile(room_id: str, body: ProfileIn, user: User = Depends(current_user),
                 db: Session = Depends(get_db)) -> ProfileOut:
     room, member = _context(db, user, room_id)
+    if member.side != "provider":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Private limits are for the freelancer's side of the deal")
     p = db.get(CopilotProfile, (room.id, user.id)) or CopilotProfile(room_id=room.id, user_id=user.id)
     p.walk_away_paise, p.target_paise = body.walk_away_paise, body.target_paise
     p.notes = " ".join(body.notes.split()) if body.notes else None

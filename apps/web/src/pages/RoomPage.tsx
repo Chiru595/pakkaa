@@ -398,7 +398,20 @@ export default function RoomPage() {
             <ErrorText>{error}</ErrorText>
           </div>
         )}
-        {isDeal && room?.my_side && (
+        {isDeal && room?.my_side === 'client' && warnings.length > 0 && (
+          <ul className="space-y-1 border-t border-slate-100 bg-white px-3 pt-2" aria-live="polite">
+            {warnings.map((w) => (
+              <li
+                key={w.code}
+                className={`rounded-lg px-2 py-1 text-xs ${w.level === 'warn' ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-600'}`}
+              >
+                {w.level === 'warn' ? '⚠ ' : 'ℹ '}
+                {w.message}
+              </li>
+            ))}
+          </ul>
+        )}
+        {isDeal && room?.my_side === 'provider' && (
           <CopilotBar
             roomId={roomId}
             side={room.my_side}

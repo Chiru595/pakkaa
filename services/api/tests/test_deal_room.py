@@ -87,8 +87,8 @@ def test_private_profile_is_never_visible_to_the_other_side(client, login_as):
     r = client.put(url, json={"walk_away_paise": 4_500_000, "target_paise": 6_000_000, "notes": "Need cash flow"},
                    headers=owner["headers"])
     assert r.status_code == 200
-    mine = client.get(url, headers=guest["headers"]).json()
-    assert mine["walk_away_paise"] is None and mine["notes"] is None and mine["side"] == "client"
+    assert client.get(url, headers=guest["headers"]).status_code == 403
+    assert "Need cash flow" not in str(client.get(f"/api/rooms/{room['id']}/deal", headers=guest["headers"]).json())
     assert client.put(url, json={"walk_away_paise": 0}, headers=owner["headers"]).status_code == 422
 
 

@@ -54,10 +54,21 @@ class ExplainOut(C.ClauseExplanation):
     disclaimer: str = "General information, not legal advice."
 
 
+COPILOT_SIDE_ONLY = "The negotiation copilot is for the freelancer's side of the deal"
+
+
 def _participant(db: Session, user: User, room_id: str) -> tuple[Room, RoomMember]:
     room, _, member = room_access(db, user, room_id)
     require_deal_room(room)
     return room, require_participant(member)
+
+
+def _provider(db: Session, user: User, room_id: str) -> tuple[Room, RoomMember]:
+    """Reply suggestions and private limits are for the freelancer's side; clients get the contract and payment."""
+    room, member = _participant(db, user, room_id)
+    if member.side != "provider":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, COPILOT_SIDE_ONLY)
+    return room, member
 
 
 def _sse(event: str, data: dict) -> str:
@@ -68,7 +79,7 @@ def _sse(event: str, data: dict) -> str:
 def suggest(room_id: str, body: SuggestIn, user: User = Depends(current_user), db: Session = Depends(get_db),
             llm: LLM = Depends(get_llm_dep)) -> StreamingResponse:
     """Streams up to three reply options as server-sent events, private to the caller."""
-    room, member = _participant(db, user, room_id)
+    room, member = _provider(db, user, room_id)
     role = getattr(membership_for(db, user.id, room.org_id), "role", None)
     data = C.build_context(db, room, user, member, llm, role).render()
     db.commit()
@@ -101,7 +112,7 @@ def suggest(room_id: str, body: SuggestIn, user: User = Depends(current_user), d
              dependencies=[Depends(rate_limit("feedback", 120, 60))])
 def feedback(room_id: str, suggestion_id: str, body: FeedbackIn, user: User = Depends(current_user),
              db: Session = Depends(get_db)) -> None:
-    room, _ = _participant(db, user, room_id)
+    room, _ = _provider(db, user, room_id)
     s = db.get(CopilotSuggestion, suggestion_id)
     if s is None or s.room_id != room.id or s.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")

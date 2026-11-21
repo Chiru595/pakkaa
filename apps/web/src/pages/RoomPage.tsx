@@ -109,7 +109,12 @@ function MembersSheet({ room, onClose }: { room: Room; onClose: () => void }) {
                 {m.role ? ROLE_LABEL[m.role] : m.side} · phone ••{m.phone_last4}
               </p>
             </div>
-            {m.verified ? <VerifiedBadge /> : <Badge tone="amber">Not verified yet</Badge>}
+            <span className="flex flex-col items-end gap-1">
+              {m.verified ? <VerifiedBadge /> : <Badge tone="amber">Not verified yet</Badge>}
+              {room.members.filter((x) => x.name.trim().toLowerCase() === m.name.trim().toLowerCase()).length > 1 && (
+                <Badge tone="red">Same name as another member</Badge>
+              )}
+            </span>
           </li>
         ))}
       </ul>
@@ -253,6 +258,9 @@ export default function RoomPage() {
   }
 
   const names = new Map(room?.members.map((m) => [`u${m.user_id}`, m]) ?? [])
+  const normal = (s: string) => s.normalize('NFKD').toLowerCase().replace(/[^a-z]/g, '')
+  const nameCount = new Map<string, number>()
+  room?.members.forEach((m) => nameCount.set(normal(m.name), (nameCount.get(normal(m.name)) ?? 0) + 1))
   const mine = myChatId
 
   return (
@@ -333,6 +341,11 @@ export default function RoomPage() {
                     {who?.name ?? 'Unknown'}
                     {who?.verified && <span className="text-emerald-600" title="Verified phone">✓</span>}
                     {who?.role && <span>· {ROLE_LABEL[who.role]}</span>}
+                    {who && (nameCount.get(normal(who.name)) ?? 0) > 1 && (
+                      <span className="font-semibold text-red-700" title="Another person in this room has the same name">
+                        ⚠ same name as another member
+                      </span>
+                    )}
                   </span>
                 )}
                 <div

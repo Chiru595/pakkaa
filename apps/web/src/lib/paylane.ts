@@ -43,14 +43,16 @@ export interface Card {
   required_approvals: number
   owner_approval_required: boolean
   approvals: { name: string; role: string; at: string }[]
-  verify_call_required: boolean
-  verify_call: { outcome: string | null; summary: string | null; ended_at: string | null } | null
+  step_up_required: boolean
+  step_up_done: boolean
+  step_up_at: string | null
+  card_hash: string
   payout: { provider: string; provider_ref: string; status: string; at: string; simulated: boolean } | null
   viewer: {
     can_approve: boolean
     can_edit: boolean
     can_payout: boolean
-    can_verify: boolean
+    can_step_up: boolean
     can_reject: boolean
     is_approver: boolean
     blocked_reason: string | null
@@ -84,13 +86,12 @@ export interface Brief {
   disclaimer: string
 }
 
-export interface VerifyStart {
-  call_id: string
-  callee_chat_id: string
-  callee_name: string
-  callee_phone_last4: string
-  questions: { q: string; expected: string }[]
-  warning: string
+export interface StepUpRequest {
+  version: number
+  hash: string
+  phone_last4: string
+  test_mode: boolean
+  test_code: string | null
 }
 
 export interface AskAnswer {
@@ -179,9 +180,10 @@ export const PayApi = {
   memory: (orgId: string) => api<MemoryEntry[]>(`/api/orgs/${orgId}/memory`),
   verifyAudit: (orgId: string) => api<AuditCheck>(`/api/orgs/${orgId}/audit/verify`),
   brief: (cardId: string) => api<Brief>(`/api/cards/${cardId}/brief`),
-  startVerify: (cardId: string) => api<VerifyStart>(`/api/cards/${cardId}/verify-call`, post()),
-  completeVerify: (cardId: string, callId: string, outcome: 'confirmed' | 'suspicious', notes: string, duration_s: number) =>
-    api<Card>(`/api/cards/${cardId}/verify-call/${callId}/complete`, post({ outcome, notes, duration_s })),
+  stepUpRequest: (cardId: string, version: number, hash: string) =>
+    api<StepUpRequest>(`/api/cards/${cardId}/step-up/request`, post({ version, hash })),
+  stepUp: (cardId: string, version: number, hash: string, code: string) =>
+    api<Card>(`/api/cards/${cardId}/step-up`, post({ version, hash, code })),
   payout: (cardId: string, idempotency_key: string) => api<Card>(`/api/cards/${cardId}/payout`, post({ idempotency_key })),
   control: (orgId: string) => api<Control>(`/api/orgs/${orgId}/control`),
   freeze: (orgId: string, reason: string) => api<Control>(`/api/orgs/${orgId}/freeze`, post({ reason })),

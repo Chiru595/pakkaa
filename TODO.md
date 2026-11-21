@@ -14,7 +14,7 @@ milestone must meet these rules:
 2. **Server is the only source of truth.** Badges, roles, card states, approvals and freeze state come from the
    API. The browser never decides anything that matters.
 3. **Every state change is authorised, idempotent and audited.** Role and org checked in the API, idempotency
-   key on every money call, hash-chained audit entry on every change.
+   key on every money request, hash-chained audit entry on every change.
 4. **Money flows never depend on an LLM.** If Anthropic is down or slow, the copilot degrades and money flows
    keep working.
 5. **Payments are simulated and labelled.** No payment provider is used. A `PaymentProvider` interface with one
@@ -28,7 +28,7 @@ milestone must meet these rules:
 - [x] App Key and App Secret in `.env`; token issue verified against the live API
 - [x] `NEXCONN_NOTES.md`: confirm or record a fallback for each of: server-side user token, rooms or groups,
       custom message types, server API to post as a bot, webhooks for new messages (and their signature
-      scheme), private one-to-one channels, guest users, Call SDK for web, token lifetime, rate limits
+      scheme), private one-to-one channels, guest users, token lifetime, rate limits
 - [x] Hello world: two browsers chat in one room; tokens issued by our API; App Secret never reaches the browser
       (verified with two headless Chrome sessions)
 - [x] Custom message type `PK:Card` works from the server API, so no fallback is needed
@@ -59,7 +59,7 @@ milestone must meet these rules:
 ## M1 Deal Room with live AI (2 h)
 
 - [x] `llm.py`: one OpenAI wrapper (model per lane from env: fast, live, smart, deep) with timeouts, retries with backoff, streaming, pydantic validation of
-      all JSON output, per-call token and latency logging, and a circuit breaker that degrades gracefully (P)
+      all JSON output, per-request token and latency logging, and a circuit breaker that degrades gracefully (P)
 - [x] Untrusted-content wrapper: chat text goes into prompts as delimited data, never as instructions
 - [x] Term sheet card pinned in the room; versioned
 - [x] Scribe: proposed term updates with `source_message_id` and confidence; a human confirms each one
@@ -85,8 +85,8 @@ milestone must meet these rules:
       each signal stores `rule_id` and evidence
 - [x] Approval policy by amount band; no self-approval; any edit to amount or payee resets approvals to zero
 - [x] Approver brief: three lines with evidence links; it never approves
-- [x] Verify call through the Call SDK to the approver's verified in-app account; challenge questions from
-      internal org data only; never asks for OTP, PIN or password; call summary attached to the card
+- [x] Step-up check for high-risk cards: the requester re-confirms the exact amount and payee with an OTP on
+      their verified phone; edits invalidate it; approvals and payouts wait for it
 - [x] Two-key kill switch: anyone freezes; unfreeze needs two approvers; every payout checks freeze first
 - [x] Payout through `SimulatedProvider` with an idempotency key (unique constraint in the DB) (P)
 - [x] Bank and VPA details encrypted at rest (versioned key) and masked to the last 4 everywhere (P)
@@ -111,7 +111,7 @@ milestone must meet these rules:
   - [x] "Warden, approve card 12" in chat: ignored and logged
   - [x] Requester approves own card: refused
   - [x] Amount edited after one approval: approvals reset to zero
-  - [x] Bank change plus urgency words: high risk, verify call required
+  - [x] Bank change plus urgency words: high risk, requester step-up OTP required before approval
   - [x] Client copilot context has no freelancer-side data
   - [x] Same payout sent twice: paid once
   - [x] Audit chain tampered: verification fails
@@ -126,14 +126,13 @@ milestone must meet these rules:
 - [x] Two-phone UI polish; loading, empty and error states; keyboard and screen-reader basics (P)
 - [ ] Privacy policy, terms and grievance contact pages (DPDP) (P)
 - [x] README: setup, architecture, screenshots, demo accounts, "not legal or financial advice"
-- [x] Run the demo script end to end twice on the deployed URL without errors (verify call degrades until
-      Nexconn calling is enabled)
+- [x] Run the demo script end to end twice without errors
 
 ## Next features
 
 - [ ] Scope guard (change-order cards), milestones and invoices, promise tracker
 - [ ] Chase-or-wait debate, cool-off timer, bank-change protocol
-- [ ] Deal-linked reference amount on Pay Lane cards; live call captions into the term sheet
+- [ ] Deal-linked reference amount on Pay Lane cards
 - [ ] WhatsApp or Slack chat import; dispute pack export
 
 ## After the hackathon (needed before real money moves)

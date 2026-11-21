@@ -7,14 +7,15 @@ Pakkaa is the money layer for business conversations, for Indian freelancers, ag
 - **Deal Room (money in):** freelancer and client negotiate in one room, each with a private AI copilot. Agreed
   terms fill a live term sheet, both sides lock it with OTP, and the advance is requested through a payment link.
 - **Pay Lane (money out):** the team's only valid channel for outgoing payments. Payment cards come only from
-  verified people, are risk-checked, verified by an in-app call when risky, approved by two people, then paid.
+  verified people, are risk-checked, re-confirmed by the requester with an OTP when risky, approved by two people,
+  then paid.
 - **It learns:** late payers, deal outcomes, Scribe corrections and payout history shape the next negotiation and
   the next risk check. Learning only ever makes checks stricter.
 
 Everyday chat stays on WhatsApp or Slack. Pakkaa is where money is decided.
 
 Live: **https://pakkaa-atozz.vercel.app** (demo mode: login codes are shown on screen, payments are simulated).
-Built on [Nexconn](https://www.nexconn.ai) Chat and Call. Nothing here is legal or financial advice.
+Built on [Nexconn](https://www.nexconn.ai) Chat. Nothing here is legal or financial advice.
 
 | Deal Room: private heads-up | Copilot (freelancer) | Copilot (client) | Pre-send check |
 |---|---|---|---|
@@ -43,8 +44,8 @@ Built on [Nexconn](https://www.nexconn.ai) Chat and Call. Nothing here is legal 
 - Approvals by amount band; the requester never approves their own card; any edit resets approvals; high-risk
   approvals need a written reason.
 - Approver brief in three lines (rewords code-built facts only; never approves).
-- Verify call over the Nexconn Call SDK to the requester's verified in-app account, with challenge questions from
-  the org's own records. Never asks for OTPs, PINs or passwords.
+- Step-up check for high-risk cards: the requester re-confirms the exact amount and payee account with an OTP on
+  their verified phone; any edit invalidates it, and nobody can approve or pay until it is done.
 - Two-key kill switch; payouts are idempotent and check the freeze first. Ask Pakkaa answers from workspace records.
 
 **Memory and learning**
@@ -68,7 +69,7 @@ Built on [Nexconn](https://www.nexconn.ai) Chat and Call. Nothing here is legal 
 ## Architecture
 
 ```
-apps/web        React + Vite + TypeScript + Tailwind (mobile first), Nexconn Web Chat and Call SDKs
+apps/web        React + Vite + TypeScript + Tailwind (mobile first), Nexconn Web Chat SDK
 services/api    FastAPI, SQLAlchemy, Alembic, Postgres + pgvector, OpenAI (one model per lane)
 scripts/        local database, secrets, demo seed, audit export verifier
 vercel.json     Vercel Services: web (Vite) and api (FastAPI, Singapore region)
@@ -101,8 +102,8 @@ one-time code appears on screen.
    advance 15 days late. Both copilots suggest different replies; the pre-send check warns below the walk-away;
    the Scribe fills the term sheet; both sign with OTP; Ravi pays the advance (simulated).
 2. **Pay Lane:** the impostor's "urgent, confidential" transfer becomes an unverified draft at risk 100. Asha's
-   card for Kabir shows the linked deal and the approver brief; Farah runs the verify call and approves, Dev
-   approves, payout (simulated).
+   card for Kabir is high risk (bank details changed), so Asha confirms it with an OTP; Farah reads the approver
+   brief and approves, Dev approves, payout (simulated).
 3. **Learning:** mark the deal won; Pay Lane → Learning shows what Pakkaa learned and the audit chain verifies.
 
 To seed your own database: `.\services\api\.venv\Scripts\python scripts\seed_demo.py` (add `--reset` to rebuild
@@ -168,16 +169,14 @@ npx tsc -b
 ```
 
 107 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
-set `TEST_DATABASE_URL`), with every model call mocked. They include the red-team cases: impostor payouts, chat
-commands to approve, self-approval, approvals reset on edit, bank change with urgency, copilot privacy between
+set `TEST_DATABASE_URL`), with every model request mocked. They include the red-team cases: impostor payouts, chat
+commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required), copilot privacy between
 sides, double payouts, audit tampering, cross-org access, payouts while frozen, and learning never loosening.
 
 ## Limitations
 
 - Payments are simulated (no payment provider in this build); every payment is labelled "Simulated".
 - Demo mode shows login codes on screen; production use needs an SMS provider with DLT-registered templates.
-- The in-app verify call needs audio/video calling enabled in the Nexconn console; until then the approver records
-  the outcome manually and the error is shown.
 - Rate bands are indicative seed estimates with source and date, not a published survey.
 
 ## Prior work

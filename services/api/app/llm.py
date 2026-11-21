@@ -5,7 +5,7 @@
   partially applied.
 - Untrusted text (chat messages, documents) is wrapped as data with `untrusted()`; system prompts tell the
   model to ignore instructions inside it.
-- A small circuit breaker stops calling the provider for a while after repeated failures, so callers degrade
+- A small circuit breaker stops sending requests to the provider for a while after repeated failures, so callers degrade
   quickly. Nothing that moves money depends on this module.
 """
 from __future__ import annotations
@@ -133,7 +133,7 @@ class LLM:
             raise
         except Exception as exc:
             self._breaker.record(False)
-            log.warning("llm call failed: %s", type(exc).__name__, extra={"purpose": purpose})
+            log.warning("llm request failed: %s", type(exc).__name__, extra={"purpose": purpose})
             raise LLMUnavailable("AI is temporarily unavailable") from exc
         self._breaker.record(True)
         elapsed_ms = int((time.monotonic() - started) * 1000)

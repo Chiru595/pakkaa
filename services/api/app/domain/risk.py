@@ -1,4 +1,4 @@
-"""Pay Lane risk engine. Rules run in code with explicit evidence; nothing here calls an LLM."""
+"""Pay Lane risk engine. Rules run in code with explicit evidence; nothing here uses an LLM."""
 from __future__ import annotations
 
 import re

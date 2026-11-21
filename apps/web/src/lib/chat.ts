@@ -8,7 +8,6 @@ import {
 } from '@nexconn/chat'
 
 import { Api, type ChatMessageOut } from './api'
-import { initCalls, installCalls } from './call'
 
 export const CARD_MESSAGE_TYPE = 'PK:Card'
 export const TEXT_MESSAGE_TYPE = 'RC:TxtMsg'
@@ -72,9 +71,7 @@ export async function connectChat(): Promise<string> {
   connecting ??= (async () => {
     const t = await Api.chatToken()
     if (initializedKey !== t.app_key) {
-      installCalls()
       NCEngine.initialize({ appKey: t.app_key, areaCode: areaCode(t.area), logLevel: LogLevel.ERROR })
-      initCalls()
       NCEngine.registerCustomMessages([{ messageType: CARD_MESSAGE_TYPE, isPersisted: true, isCounted: true }])
       NCEngine.addMessageHandler('pakkaa', new MessageHandler({ onMessageReceived: ({ messages }) => dispatch(messages) }))
       NCEngine.addConnectionStatusHandler(

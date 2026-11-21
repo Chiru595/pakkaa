@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router'
 import CopilotBar, { type Chosen } from '../components/deal/CopilotBar'
 import TermSheetPanel, { CounterpartyNotes } from '../components/deal/TermSheetPanel'
 import CardsPanel from '../components/paylane/CardsPanel'
-import IncomingCall from '../components/paylane/IncomingCall'
 import { Badge, Button, ErrorText, Screen, Spinner, VerifiedBadge } from '../components/ui'
 import { Api, ROLE_LABEL, type Room, TEAM_ROLES } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -425,7 +424,6 @@ export default function RoomPage() {
         {showCards && room && myRole && (
           <CardsPanel roomId={room.id} orgId={room.org_id} role={myRole} focusCardId={focusCard} onClose={() => setShowCards(false)} />
         )}
-        <IncomingCall nameFor={(chatId) => names.get(chatId)?.name ?? 'A teammate'} />
         {showSheet && deal && (
           <TermSheetPanel
             roomId={roomId}

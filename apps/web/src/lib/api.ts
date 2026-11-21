@@ -136,7 +136,7 @@ export async function api<T>(path: string, init: RequestInit = {}, retry = true)
   return (await res.json()) as T
 }
 
-/** POSTs and reads a server-sent event stream, calling `onEvent` for each event as it arrives. */
+/** POSTs and reads a server-sent event stream, passing each event to `onEvent` as it arrives. */
 export async function streamEvents(
   path: string,
   body: unknown,

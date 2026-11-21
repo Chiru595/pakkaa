@@ -1,114 +1,82 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
-import { endCall, onCallEvents, startVerifyCall } from '../../lib/call'
 import { parseRupees } from '../../lib/deal'
-import { type Brief, type Card, newIdempotencyKey, PayApi, STATE_LABEL, type VerifyStart } from '../../lib/paylane'
+import { type Brief, type Card, newIdempotencyKey, PayApi, STATE_LABEL, type StepUpRequest } from '../../lib/paylane'
 import { Badge, Button, ErrorText } from '../ui'
 
 const RISK_TONE = { low: 'green', medium: 'amber', high: 'red' } as const
 
-function VerifyCall({ card, onDone }: { card: Card; onDone: (c: Card) => void }) {
-  const [start, setStart] = useState<VerifyStart | null>(null)
-  const [callId, setCallId] = useState<string | null>(null)
-  const [state, setState] = useState<'idle' | 'ringing' | 'connected' | 'ended' | 'failed'>('idle')
-  const [notes, setNotes] = useState('')
+function StepUp({ card, onDone }: { card: Card; onDone: (c: Card) => void }) {
+  const [req, setReq] = useState<StepUpRequest | null>(null)
+  const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const startedAt = useRef<number | null>(null)
 
-  useEffect(
-    () =>
-      onCallEvents((e) => {
-        if (e.type === 'connected' && e.callId === callId) {
-          startedAt.current = Date.now()
-          setState('connected')
-        }
-        if (e.type === 'ended' && e.callId === callId) setState('ended')
-      }),
-    [callId],
-  )
-
-  async function begin() {
+  async function send() {
     setError(null)
     setBusy(true)
     try {
-      const s = await PayApi.startVerify(card.id)
-      setStart(s)
-      setState('ringing')
-      try {
-        setCallId(await startVerifyCall(s.callee_chat_id, card.id))
-      } catch (err) {
-        setState('failed')
-        setError(err instanceof Error ? err.message : 'The call could not start')
-      }
+      setReq(await PayApi.stepUpRequest(card.id, card.version, card.card_hash))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start the verify call')
+      setError(err instanceof Error ? err.message : 'Could not send the code')
     } finally {
       setBusy(false)
     }
   }
 
-  async function finish(outcome: 'confirmed' | 'suspicious') {
-    if (!start) return
-    setBusy(true)
+  async function confirm(e: FormEvent) {
+    e.preventDefault()
+    if (!req) return
     setError(null)
+    setBusy(true)
     try {
-      await endCall(callId ?? undefined)
-      const secs = startedAt.current ? Math.round((Date.now() - startedAt.current) / 1000) : 0
-      onDone(await PayApi.completeVerify(card.id, start.call_id, outcome, notes.trim(), secs))
+      onDone(await PayApi.stepUp(card.id, req.version, req.hash, code))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the result')
+      setError(err instanceof Error ? err.message : 'Could not confirm')
     } finally {
       setBusy(false)
     }
   }
 
-  if (!start) {
-    return (
-      <div className="space-y-2 rounded-2xl border border-red-200 bg-red-50/60 p-3">
-        <p className="text-sm text-red-900">High risk. Call the requester on their verified in-app account before anyone approves.</p>
-        <Button onClick={() => void begin()} busy={busy} className="w-full">
-          📞 Start verify call
-        </Button>
-        <ErrorText>{error}</ErrorText>
-      </div>
-    )
-  }
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 p-3">
-      <p className="text-sm font-semibold text-ink">
-        Calling {start.callee_name} (in-app, ••{start.callee_phone_last4}) ·{' '}
-        <span className="font-normal text-slate-500">{state}</span>
+    <section className="space-y-2 rounded-2xl border border-red-200 bg-red-50/60 p-3" aria-label="Step-up check">
+      <h3 className="text-sm font-semibold text-red-900">Step-up check: confirm this exact card</h3>
+      <p className="text-sm text-red-900">
+        High risk. Confirm <strong>{card.amount_display}</strong> to{' '}
+        <strong>{card.payee ? `${card.payee.name} · ${card.payee.masked}` : 'this payee'}</strong> with the one-time code
+        sent to your verified phone. Approvers can act only after this.
       </p>
-      <p className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">⚠ {start.warning}</p>
-      <ol className="list-decimal space-y-1.5 pl-5 text-sm">
-        {start.questions.map((q) => (
-          <li key={q.q}>
-            {q.q}
-            <span className="block text-xs text-slate-500">Expect: {q.expected}</span>
-          </li>
-        ))}
-      </ol>
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        maxLength={500}
-        rows={2}
-        placeholder="What did they say?"
-        aria-label="Call notes"
-        className="w-full rounded-xl border border-slate-300 p-2 text-sm"
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <Button onClick={() => void finish('confirmed')} busy={busy}>
-          They confirmed
+      {!req ? (
+        <Button onClick={() => void send()} busy={busy} className="w-full">
+          Send code to my phone
         </Button>
-        <Button variant="danger" onClick={() => void finish('suspicious')} busy={busy}>
-          Suspicious
-        </Button>
-      </div>
+      ) : (
+        <form onSubmit={confirm} className="space-y-2">
+          {req.test_mode && req.test_code && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+              <strong>Test mode:</strong> no SMS is sent. Your code is{' '}
+              <span className="font-mono font-bold tracking-widest">{req.test_code}</span>
+            </p>
+          )}
+          <label className="block space-y-1 text-sm">
+            <span className="font-medium text-ink">Code sent to ••{req.phone_last4}</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              aria-label="Step-up code"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 tracking-widest focus:border-brand focus:outline-none"
+            />
+          </label>
+          <Button type="submit" busy={busy} disabled={code.length !== 6} className="w-full">
+            Confirm {card.amount_display}
+          </Button>
+        </form>
+      )}
       <ErrorText>{error}</ErrorText>
-    </div>
+    </section>
   )
 }
 
@@ -274,16 +242,19 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
               {card.approvals.map((a) => (
                 <p key={a.name}>✓ {a.name} ({a.role})</p>
               ))}
-              {card.verify_call && (
-                <p className="text-slate-600">
-                  Verify call: <strong>{card.verify_call.outcome}</strong>
-                  {card.verify_call.summary ? ` · “${card.verify_call.summary}”` : ''}
+              {card.step_up_required && card.step_up_done && (
+                <p className="text-emerald-800">
+                  ✓ Step-up check: {card.requester?.name ?? 'the requester'} confirmed this exact card with an OTP
+                  {card.step_up_at ? ` · ${new Date(card.step_up_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}
                 </p>
+              )}
+              {card.step_up_required && !card.step_up_done && card.state === 'pending_approval' && !card.viewer.can_step_up && (
+                <p className="text-slate-600">Step-up check: waiting for {card.requester?.name ?? 'the requester'} to confirm with an OTP</p>
               )}
             </section>
 
             {card.viewer.blocked_reason && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{card.viewer.blocked_reason}</p>}
-            {card.viewer.can_verify && !card.verify_call && <VerifyCall card={card} onDone={update} />}
+            {card.viewer.can_step_up && <StepUp card={card} onDone={update} />}
 
             <div className="grid gap-2">
               {card.viewer.can_approve && card.risk_level === 'high' && (
@@ -294,7 +265,7 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
                     onChange={(e) => setOverrideReason(e.target.value)}
                     maxLength={300}
                     rows={2}
-                    placeholder="e.g. Confirmed the new bank details with Ravi on the verify call"
+                    placeholder="e.g. Confirmed the new bank details with Kabir in person"
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
                   />
                   <span className="text-xs text-slate-500">Kept with the card so the team can learn from overrides.</span>

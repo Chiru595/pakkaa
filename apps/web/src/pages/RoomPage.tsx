@@ -32,7 +32,14 @@ function DealBar({ deal, onOpen }: { deal: Deal; onOpen: () => void }) {
           {adv?.value != null ? ` · ${adv.display} advance` : ''}
         </span>
       </span>
-      {deal.proposals.length > 0 && <Badge tone="amber">{deal.proposals.length} to confirm</Badge>}
+      {deal.proposals.length > 0 &&
+        (ts.status === 'locked' ? (
+          <Badge>
+            {deal.proposals.length} suggested {deal.proposals.length === 1 ? 'change' : 'changes'}
+          </Badge>
+        ) : (
+          <Badge tone="amber">{deal.proposals.length} to confirm</Badge>
+        ))}
       <Badge tone={ts.status === 'locked' ? 'green' : 'slate'}>{ts.status === 'locked' ? 'Locked' : 'Draft'}</Badge>
     </button>
   )

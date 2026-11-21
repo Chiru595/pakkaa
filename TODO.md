@@ -3,7 +3,7 @@
 **Deal pakkaa! Payment pakkaa!** The money layer for business conversations.
 
 Status key: `[ ]` to do · `[~]` in progress · `[x]` done and deployed · `(P)` production-hardening item.
-After each milestone: tests green, commit, deploy, update this file and `PRIOR_WORK.md`.
+Commit and push after every working slice; after each milestone also deploy and update this file.
 
 ## Product bar
 
@@ -72,15 +72,15 @@ milestone must meet these rules:
       needs both again
 - [ ] Advance payment link through `SimulatedProvider` (hosted pay page, then paid or failed status)
 - [ ] Card updates only from provider status, never from chat text (P)
-- [ ] Ported from PaidSafe: `interest.py`, `factcheck.py`, `evidence.py`, rule packs, their tests
+- [ ] Ledger: rule packs with `source` and `as_of`, statutory interest, number fact-check for AI text
 
 ## M2 Pay Lane with live AI (2 h)
 
 - [ ] Natural-language card builder ("pay Ravi 40k for the logo work") linked to the matching deal; the
       requester confirms
-- [ ] Verified badges from server state; display-name and photo collision flags (PaidSafe impostor case)
+- [ ] Verified badges from server state; display-name and photo collision flags (impostor case)
 - [ ] Money-talk detector: payment instructions in chat become unverified draft cards, never executed
-- [ ] Risk engine (ported from the Warden's approach): new payee, changed bank details, above payee baseline,
+- [ ] Risk engine (rules in code): new payee, changed bank details, above payee baseline,
       urgency or secrecy words, off-hours, first-time requester, split payments under a threshold;
       each signal stores `rule_id` and evidence
 - [ ] Approval policy by amount band; no self-approval; any edit to amount or payee resets approvals to zero
@@ -128,7 +128,7 @@ milestone must meet these rules:
 ## Sunday (P1, for the Nexconn submission, due 22 Nov 2026 23:59 AoE)
 
 - [ ] Scope guard (change-order cards), milestones and invoices, promise tracker
-- [ ] Chase-or-wait debate (port from PaidSafe), cool-off timer, bank-change protocol
+- [ ] Chase-or-wait debate, cool-off timer, bank-change protocol
 - [ ] Deal-linked reference amount on Pay Lane cards; live call captions into the term sheet
 - [ ] WhatsApp or Slack chat import; dispute pack export
 - [ ] Submission: live link, public repo, demo video, write-up, App Key, prior-work disclosure
@@ -144,4 +144,4 @@ milestone must meet these rules:
 ## Definition of done for today
 
 M0 to M4 on the deployed URL, red-team tests passing, demo script runs end to end twice, README with setup
-and screenshots, `PRIOR_WORK.md` filled.
+and screenshots.

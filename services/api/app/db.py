@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.config import get_settings
 
@@ -29,7 +30,11 @@ _session_factory: sessionmaker[Session] | None = None
 def get_engine():
     global _engine, _session_factory
     if _engine is None:
-        _engine = create_engine(get_settings().database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
+        settings = get_settings()
+        if settings.serverless:
+            _engine = create_engine(settings.database_url, poolclass=NullPool)
+        else:
+            _engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
         _session_factory = sessionmaker(_engine, expire_on_commit=False)
     return _engine
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     llm_transcribe_model: str = "gpt-transcribe"
 
     webhook_max_skew_seconds: int = Field(default=300)
+    serverless: bool = Field(default=False, validation_alias="VERCEL")
+
+    @field_validator("database_url", "database_url_unpooled")
+    @classmethod
+    def _psycopg_driver(cls, v: str) -> str:
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     @property
     def is_production(self) -> bool:

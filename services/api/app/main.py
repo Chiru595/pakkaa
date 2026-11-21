@@ -8,7 +8,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.integrations.nexconn import NexconnClient
 from app.routers import auth, messages, orgs, webhooks
 
 
@@ -18,10 +17,10 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.nexconn = NexconnClient(settings.nexconn_app_key, settings.nexconn_app_secret,
-                                          settings.nexconn_hosts)
         yield
-        app.state.nexconn.close()
+        client = getattr(app.state, "nexconn", None)
+        if client is not None:
+            client.close()
 
     app = FastAPI(title="Pakkaa API", version="0.1.0", lifespan=lifespan,
                   docs_url=None if settings.is_production else "/api/docs", openapi_url="/api/openapi.json")

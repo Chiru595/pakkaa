@@ -78,6 +78,44 @@ class FakeNexconn:
         return [c[0] for c in self.calls]
 
 
+class FakeLLM:
+    """Records every prompt it receives and answers from canned outputs keyed by purpose."""
+
+    def __init__(self) -> None:
+        self.outputs: dict[str, list] = {}
+        self.calls: list[dict] = []
+        self.available = True
+
+    def queue(self, purpose: str, *outputs) -> None:
+        self.outputs.setdefault(purpose, []).extend(outputs)
+
+    def structured(self, lane, task, data, schema, *, max_output_tokens=0, purpose=""):
+        from app.llm import LLMUnavailable
+
+        self.calls.append({"purpose": purpose, "lane": lane, "task": task, "data": data})
+        if not self.available or not self.outputs.get(purpose):
+            raise LLMUnavailable("no canned output")
+        out = self.outputs[purpose].pop(0)
+        if isinstance(out, Exception):
+            raise out
+        return schema.model_validate(out)
+
+    def stream_items(self, lane, task, data, item_schema, *, max_items=3, max_output_tokens=0, purpose=""):
+        from app.llm import LLMUnavailable
+
+        self.calls.append({"purpose": purpose, "lane": lane, "task": task, "data": data})
+        if not self.available or not self.outputs.get(purpose):
+            raise LLMUnavailable("no canned output")
+        for item in self.outputs[purpose].pop(0)[:max_items]:
+            yield item_schema.model_validate(item)
+
+    def embed(self, texts):
+        return [[float(len(t) % 7) / 7] * 1536 for t in texts]
+
+    def data_for(self, purpose: str) -> str:
+        return chr(10).join(c["data"] + c["task"] for c in self.calls if c["purpose"] == purpose)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def migrated_db():
     cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
@@ -110,8 +148,16 @@ def nexconn() -> FakeNexconn:
 
 
 @pytest.fixture
-def app(nexconn):
+def llm() -> FakeLLM:
+    return FakeLLM()
+
+
+@pytest.fixture
+def app(nexconn, llm):
+    from app.deps import get_llm_dep
+
     application = create_app()
+    application.dependency_overrides[get_llm_dep] = lambda: llm
     return application
 
 

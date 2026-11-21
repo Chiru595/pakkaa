@@ -4,6 +4,7 @@ from fastapi import Request
 
 from app.config import get_settings
 from app.integrations.nexconn import NexconnClient
+from app.llm import LLM, get_llm
 
 
 def get_nexconn(request: Request) -> NexconnClient:
@@ -14,3 +15,7 @@ def get_nexconn(request: Request) -> NexconnClient:
         client = NexconnClient(s.nexconn_app_key, s.nexconn_app_secret, s.nexconn_hosts)
         request.app.state.nexconn = client
     return client
+
+
+def get_llm_dep() -> LLM:
+    return get_llm()

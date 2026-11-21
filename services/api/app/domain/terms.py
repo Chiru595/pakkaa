@@ -128,11 +128,12 @@ def review(terms: dict[str, Any], pending_proposals: int = 0) -> list[ReviewItem
             items.append(ReviewItem("missing", d.key, f"{d.label} is not agreed yet"))
     pct = v.get("advance_pct")
     if pct is not None and pct < 25:
-        items.append(ReviewItem("risk", "advance_pct",
-                                f"Advance is {pct}%. With a new client, at least 25% upfront protects you if they go quiet"))
+        items.append(ReviewItem(
+            "risk", "advance_pct",
+            f"Advance is {pct}%. With a new client, at least 25% upfront protects you if they go quiet"))
     if v.get("revisions") is None:
-        items.append(ReviewItem("risk", "revisions", "No cap on revision rounds. Unlimited changes are the usual source "
-                                                     "of scope creep"))
+        items.append(ReviewItem(
+            "risk", "revisions", "No cap on revision rounds. Unlimited changes are the usual source of scope creep"))
     due = v.get("payment_due_days")
     if due is None:
         items.append(ReviewItem("risk", "payment_due_days", "No due date for the balance payment"))
@@ -147,5 +148,6 @@ def review(terms: dict[str, Any], pending_proposals: int = 0) -> list[ReviewItem
         items.append(ReviewItem("info", "cancellation", "No cancellation term. Say what happens to the advance if the "
                                                          "project stops"))
     if pending_proposals:
-        items.append(ReviewItem("info", None, f"{pending_proposals} Scribe suggestion(s) are still waiting for a decision"))
+        items.append(ReviewItem(
+            "info", None, f"{pending_proposals} Scribe suggestion(s) are still waiting for a decision"))
     return items

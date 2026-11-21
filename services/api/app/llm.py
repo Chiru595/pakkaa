@@ -136,7 +136,8 @@ class LLM:
             log.warning("llm call failed: %s", type(exc).__name__, extra={"purpose": purpose})
             raise LLMUnavailable("AI is temporarily unavailable") from exc
         self._breaker.record(True)
-        log.info("llm ok", extra={"purpose": purpose, "lane": lane.value, "ms": int((time.monotonic() - started) * 1000)})
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        log.info("llm ok", extra={"purpose": purpose, "lane": lane.value, "ms": elapsed_ms})
         return parsed if isinstance(parsed, schema) else schema.model_validate(parsed)
 
     def stream_items(self, lane: Lane, task: str, data: str, item_schema: type[T], *, max_items: int = 3,
@@ -191,7 +192,7 @@ class LLM:
         return [d.embedding for d in res.data]
 
 
-def _parse_line(line: str, schema: type[T], purpose: str) -> T | None:
+def _parse_line[M: BaseModel](line: str, schema: type[M], purpose: str) -> M | None:
     line = line.strip().strip("`").strip()
     if not line or line.startswith("json"):
         return None

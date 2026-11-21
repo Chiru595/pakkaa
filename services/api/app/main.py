@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import auth, messages, orgs, webhooks
+from app.routers import auth, deals, messages, orgs, webhooks
 
 
 def create_app() -> FastAPI:
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.me_router)
     app.include_router(orgs.router)
     app.include_router(messages.router)
+    app.include_router(deals.router)
     app.include_router(webhooks.router)
     return app
 

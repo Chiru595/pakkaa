@@ -3,15 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.dispatch import on_new_message
 from app.db import get_db
-from app.deps import get_nexconn
+from app.deps import get_llm_dep, get_nexconn
 from app.domain.rooms import NexconnError, send_text
 from app.integrations.nexconn import NexconnClient
+from app.llm import LLM
 from app.models import ChatMessage, User
 from app.schemas import MessageText
 from app.security.deps import current_user, rate_limit, room_access
@@ -51,8 +53,9 @@ def list_messages(room_id: str, before: int | None = Query(default=None, descrip
 
 @router.post("/{room_id}/messages", response_model=MessageOut, status_code=201,
              dependencies=[Depends(rate_limit("send", 120, 60))])
-def post_message(room_id: str, body: MessageIn, user: User = Depends(current_user), db: Session = Depends(get_db),
-                 nexconn: NexconnClient = Depends(get_nexconn)) -> MessageOut:
+def post_message(room_id: str, body: MessageIn, background: BackgroundTasks, user: User = Depends(current_user),
+                 db: Session = Depends(get_db), nexconn: NexconnClient = Depends(get_nexconn),
+                 llm: LLM = Depends(get_llm_dep)) -> MessageOut:
     room, _, member = room_access(db, user, room_id)
     if member is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Join the room before posting")
@@ -60,4 +63,5 @@ def post_message(room_id: str, body: MessageIn, user: User = Depends(current_use
         msg = send_text(db, nexconn, room, user, body.text)
     except NexconnError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Message not delivered. Try again") from exc
+    background.add_task(on_new_message, room.id, msg.id, nexconn, llm)
     return message_out(msg)

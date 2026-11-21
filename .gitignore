@@ -26,4 +26,3 @@ legacy/
 .pgdata/
 
 .vercel
-.env*

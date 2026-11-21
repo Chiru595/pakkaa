@@ -38,16 +38,16 @@ Prerequisites: Git, Python 3.12, Node.js 20 or newer.
    ```powershell
    git clone https://github.com/Chiru595/pakkaa
    cd pakkaa
-   py -3.12 scripts/gen_secrets.py
+   py -3.12 scripts\gen_secrets.py
    ```
    Then open `.env` and fill `NEXCONN_APP_KEY`, `NEXCONN_APP_SECRET` and `OPENAI_API_KEY`.
 
 2. API dependencies:
    ```powershell
-   cd services/api
+   cd servicespi
    py -3.12 -m venv .venv
    .venv\Scripts\python -m pip install -r requirements.txt -r requirements-dev.txt
-   cd ../..
+   cd ..\..
    ```
 
 3. Database (Postgres 16 with pgvector). Either Docker:
@@ -56,19 +56,19 @@ Prerequisites: Git, Python 3.12, Node.js 20 or newer.
    ```
    or, without Docker, an embedded Postgres that also updates `.env`:
    ```powershell
-   services/api/.venv/Scripts/python scripts/dev_db.py
+   .\services\api\.venv\Scripts\python scripts\dev_db.py
    ```
 
 4. Migrations and API (keep this terminal open):
    ```powershell
-   cd services/api
+   cd servicespi
    .venv\Scripts\alembic upgrade head
    .venv\Scripts\python -m uvicorn app.main:app --port 8000 --reload --reload-dir app
    ```
 
 5. Web app (second terminal):
    ```powershell
-   cd apps/web
+   cd apps\web
    npm install
    npm run dev
    ```
@@ -84,7 +84,7 @@ After a restart, run `scripts/dev_db.py` again (if you use the embedded database
 cd services/api
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python -m ruff check app tests
-cd ../../apps/web
+cd ..\..pps\web
 npx tsc -b
 ```
 

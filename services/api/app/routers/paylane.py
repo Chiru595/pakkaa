@@ -112,6 +112,7 @@ class CardIn(BaseModel):
     amount_paise: int = Field(gt=0, le=MAX_AMOUNT_PAISE)
     reason: str = Field(min_length=2, max_length=300, pattern=r"^[^\x00-\x1f\x7f]+$")
     deal_room_id: str | None = Field(default=None, max_length=32)
+    request_text: str | None = Field(default=None, max_length=400)
 
 
 class CardEdit(BaseModel):
@@ -364,7 +365,8 @@ def create_card(room_id: str, body: CardIn, user: User = Depends(current_user), 
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Pick a payee from your verified payee list")
     card = P.create_card(db, room=room, requester=user, requester_role=m.role, payee=payee, payee_name_claimed=None,
                          amount_paise=body.amount_paise, reason=" ".join(body.reason.split()),
-                         deal_room_id=body.deal_room_id, source="builder", state=CardState.PENDING)
+                         deal_room_id=body.deal_room_id, source="builder", state=CardState.PENDING,
+                         extra_text=" ".join((body.request_text or "").split()))
     db.commit()
     _notify(db, nexconn, settings, card, f"Card #{card.number}: {user.name} requests {format_inr(card.amount_paise)} "
                                          f"to {payee.name} · {card.risk_level} risk")

@@ -320,6 +320,7 @@ class PaymentCard(Base):
     deal_room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
     amount_paise: Mapped[int] = mapped_column(BigInteger)
     reason: Mapped[str] = mapped_column(String(300))
+    request_text: Mapped[str | None] = mapped_column(String(1000))
     state: Mapped[str] = mapped_column(String(20))
     source: Mapped[str] = mapped_column(String(20))
     source_message_id: Mapped[str | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="SET NULL"))

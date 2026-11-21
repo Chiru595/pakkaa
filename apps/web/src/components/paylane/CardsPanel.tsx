@@ -44,7 +44,15 @@ function NewCard({ roomId, payees, onCreated }: { roomId: string; payees: Payee[
     setBusy(true)
     setError(null)
     try {
-      onCreated(await PayApi.create(roomId, { payee_id: payeeId, amount_paise: paise, reason: reason.trim(), deal_room_id: dealId || null }))
+      onCreated(
+        await PayApi.create(roomId, {
+          payee_id: payeeId,
+          amount_paise: paise,
+          reason: reason.trim(),
+          deal_room_id: dealId || null,
+          request_text: text.trim(),
+        }),
+      )
       setDraft(null)
       setText('')
     } catch (err) {

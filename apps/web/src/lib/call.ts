@@ -6,6 +6,8 @@ import {
   NCCallType,
 } from '@nexconn/call'
 
+import { connectChat } from './chat'
+
 export interface IncomingCall {
   callId: string
   fromChatId: string
@@ -56,15 +58,22 @@ function requireEngine(): NCCallEngine {
   return engine
 }
 
+const CALL_ERRORS: Record<number, string> = {
+  80002: 'You are already on a call.',
+  80006: 'In-app calling is not switched on for this workspace yet (code 80006).',
+  80012: 'Chat is reconnecting. Try again in a moment.',
+}
+
 /** Audio-only call to a teammate's in-app account. The callee id comes from the server, never from a message. */
 export async function startVerifyCall(calleeChatId: string, cardId: string): Promise<string> {
+  await connectChat()
   const res = await requireEngine().startCall({
     calleeIds: [calleeChatId],
     callType: NCCallType.SINGLE,
     mediaType: NCCallMediaType.AUDIO,
     extra: JSON.stringify({ card_id: cardId, purpose: 'verify' }),
   })
-  if (res.code !== 0 || !res.callId) throw new Error(`Call could not start (code ${res.code}). Is calling enabled?`)
+  if (res.code !== 0 || !res.callId) throw new Error(CALL_ERRORS[res.code] ?? `Call could not start (code ${res.code}).`)
   return res.callId
 }
 

@@ -61,10 +61,11 @@ def _apply_assessment(db: Session, card: PaymentCard, a: R.Assessment) -> None:
                           message=s.message, evidence=s.evidence))
 
 
-def assess_card(db: Session, card: PaymentCard, requester_role: str | None, extra_text: str = "") -> R.Assessment:
+def assess_card(db: Session, card: PaymentCard, requester_role: str | None) -> R.Assessment:
+    """Risk words are checked in the reason and in the original request text the person typed."""
     return R.assess(db, org_id=card.org_id, card_id=card.id, payee_id=card.payee_id, amount_paise=card.amount_paise,
                     reason=card.reason, requester_id=card.requester_id, requester_role=requester_role,
-                    extra_text=extra_text, deal_room_id=card.deal_room_id)
+                    extra_text=card.request_text or "", deal_room_id=card.deal_room_id)
 
 
 def create_card(db: Session, *, room: Room, requester: User | None, requester_role: str | None,
@@ -79,11 +80,12 @@ def create_card(db: Session, *, room: Room, requester: User | None, requester_ro
     ctl.card_seq += 1
     card = PaymentCard(org_id=room.org_id, room_id=room.id, number=ctl.card_seq, payee_id=payee.id if payee else None,
                        payee_name_claimed=payee_name_claimed, deal_room_id=deal_room_id, amount_paise=amount_paise,
-                       reason=reason, state=state, source=source, source_message_id=source_message_id,
-                       requester_id=requester.id if requester else None, version=1)
+                       reason=reason, request_text=extra_text[:1000] or None, state=state, source=source,
+                       source_message_id=source_message_id, requester_id=requester.id if requester else None,
+                       version=1)
     db.add(card)
     db.flush()
-    _apply_assessment(db, card, assess_card(db, card, requester_role, extra_text))
+    _apply_assessment(db, card, assess_card(db, card, requester_role))
     audit.record(db, "card.create", actor_user_id=requester.id if requester else None, org_id=room.org_id,
                  subject_type="payment_card", subject_id=card.id,
                  payload={"number": card.number, "amount_paise": amount_paise, "payee_id": card.payee_id,

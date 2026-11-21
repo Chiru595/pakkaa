@@ -303,3 +303,9 @@ def test_ask_pakkaa_answers_from_org_records_only(client, team, llm, login_as):
     assert r["ai_worded"] and r["answer"] == "Print Co has never been paid [F1]."
     other = login_as(OUTSIDER, "Bob")
     assert client.post(url, json={"question": "Did we pay Print Co?"}, headers=other["headers"]).status_code == 404
+
+
+def test_urgency_in_typed_request_counts_even_if_reason_is_clean(client, team):
+    card = new_card(client, team, amount=500_000, reason="final files",
+                    request_text="pay Ravi 5k urgently for final files, need it immediately")
+    assert {"urgency"} <= {s["rule_id"] for s in card["signals"]}

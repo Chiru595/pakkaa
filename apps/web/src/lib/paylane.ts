@@ -114,7 +114,10 @@ export const PayApi = {
   cards: (roomId: string) => api<Card[]>(`/api/rooms/${roomId}/cards`),
   card: (cardId: string) => api<Card>(`/api/cards/${cardId}`),
   parse: (roomId: string, text: string) => api<ParsedDraft>(`/api/rooms/${roomId}/cards/parse`, post({ text })),
-  create: (roomId: string, body: { payee_id: string; amount_paise: number; reason: string; deal_room_id?: string | null }) =>
+  create: (
+    roomId: string,
+    body: { payee_id: string; amount_paise: number; reason: string; deal_room_id?: string | null; request_text?: string },
+  ) =>
     api<Card>(`/api/rooms/${roomId}/cards`, post(body)),
   edit: (cardId: string, body: { amount_paise?: number; payee_id?: string; reason?: string }) =>
     api<Card>(`/api/cards/${cardId}`, json('PATCH', body)),

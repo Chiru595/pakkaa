@@ -1,0 +1,37 @@
+# India: MSMED Act 2006 (delayed payments to micro and small enterprises) + Income Tax Act s.43B(h).
+# Every value carries source_url and as_of. The Ledger refuses to calculate with a rate older than
+# max_rate_age_days unless the Accountant confirms it.
+# Information only. Not legal or financial advice.
+jurisdiction: india_msmed
+applies_to: "Udyam-registered micro and small enterprise suppliers (s.43B(h) does not apply to pure traders)"
+payment_deadline:
+  max_days_with_agreement: 45
+  days_without_agreement: 15
+  source_url: "https://samadhaan.msme.gov.in/"   # MSMED Act 2006, s.15 (delayed-payment chapter, ss.15-24)
+  as_of: "2026-11-07"
+interest:
+  method: compound_monthly_rests
+  multiple_of_bank_rate: 3
+  starts: day_after_due_date
+  source_url: "https://samadhaan.msme.gov.in/"   # MSMED Act 2006, s.16
+  as_of: "2026-11-07"
+bank_rate:
+  value_pct: 5.75
+  source_url: "https://www.rbi.org.in/scripts/BS_PressReleaseDisplay.aspx?prid=63742"
+  as_of: "2026-10-07"
+  note: "RBI monetary policy statement of 7 Oct 2026 (repo 5.50%, Bank Rate 5.75%). Re-check after each MPC meeting."
+max_rate_age_days: 120
+interest_not_deductible_for_buyer:
+  section: "MSMED Act s.23"
+  source_url: "https://samadhaan.msme.gov.in/WriteReadData/DocumentFile/MSMED2006act.pdf"
+tax_lever:
+  section: "Income-tax Act 1961 s.43B(h); Income-tax Act 2025 s.37(2)(g) (per secondary sources, verify)"
+  rule: "If the buyer pays an MSE after the s.15 deadline, the expense is deductible only in the year actually paid."
+  illustrative_tax_rate_pct: 25
+  source_url: "https://incometaxindia.gov.in/"
+  as_of: "2026-11-07"
+  note: "Official text not machine-readable at build time; treat as a lever to raise, not a computed figure."
+forums:
+  - "State MSME Facilitation Council (MSEFC)"
+  - "MSME Samadhaan portal: https://samadhaan.msme.gov.in/ (new cases: MSME ODR portal https://odr.msme.gov.in/)"
+disclaimer: "Calculations follow the cited public rules for information only. Not legal or financial advice."

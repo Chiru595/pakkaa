@@ -1,0 +1,22 @@
+# env and secrets
+.env
+.env.*
+!.env.example
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# node
+node_modules/
+dist/
+.vercel/
+# legacy runtime state
+legacy/paidsafe/state/*.db
+legacy/paidsafe/state/audit.log
+legacy/paidsafe/outbox/
+# os
+.DS_Store
+Thumbs.db

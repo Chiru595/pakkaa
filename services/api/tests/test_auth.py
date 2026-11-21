@@ -27,8 +27,29 @@ def test_full_signup_and_me(client, login_as):
     assert "phone_e164" not in me
 
 
-def test_invalid_phone_rejected(client):
-    assert client.post("/api/auth/otp/request", json={"phone": "1234567"}).status_code == 400
+def test_phone_formats_and_rejections():
+    import pytest
+
+    from app.security.otp import OtpError, normalize_phone
+
+    for raw in ["9876543210", "98765 43210", "098765 43210", "+91 98765 43210", "+91-98765-43210", "919876543210"]:
+        assert normalize_phone(raw) == E164, raw
+    for raw in ["98765432101", "1234567890", "5876543210", "+1 415 555 0100", "+92 9876543210", "987654321"]:
+        with pytest.raises(OtpError):
+            normalize_phone(raw)
+
+
+def test_invalid_phone_rejected_by_api(client):
+    assert client.post("/api/auth/otp/request", json={"phone": "98765432101"}).status_code == 400
+    assert client.post("/api/auth/otp/request", json={"phone": "98765abc10"}).status_code == 422
+    assert client.post("/api/auth/otp/request", json={"phone": "98765"}).status_code == 422
+
+
+def test_whitespace_only_name_rejected(client, sent_codes):
+    _request(client)
+    r = client.post("/api/auth/otp/verify", json={"phone": PHONE, "code": sent_codes[E164], "name": "   ",
+                                                   "consent": True})
+    assert r.status_code == 422
 
 
 def test_wrong_code_locks_after_max_attempts(client, sent_codes):
@@ -90,6 +111,15 @@ def test_refresh_rotates_and_reuse_signs_out_family(client, login_as, db):
     assert client.post("/api/auth/refresh").status_code == 401
     assert client.get("/api/me", headers={"Authorization": f"Bearer {new_access}"}).status_code == 401
     assert client.get("/api/me", headers=s["headers"]).status_code == 401
+
+
+def test_session_hint_cookie_set_and_cleared(client, login_as):
+    login_as(PHONE)
+    assert client.cookies.get("pk_session") == "1"
+    client.cookies.set("pk_refresh", "forged", path="/api/auth")
+    r = client.post("/api/auth/refresh")
+    assert r.status_code == 401
+    assert 'pk_session=""' in r.headers.get("set-cookie", "") or "pk_session=;" in r.headers.get("set-cookie", "")
 
 
 def test_logout_ends_session(client, login_as):

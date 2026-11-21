@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,7 @@ from app.models import (
     RoomType,
     User,
 )
+from app.schemas import PersonName, PhoneInput, Title
 from app.security import audit
 from app.security.deps import current_user, membership_for, rate_limit, require_org_role, room_access
 from app.security.otp import OtpError, normalize_phone
@@ -38,7 +39,7 @@ INVITE_TTL = timedelta(hours=72)
 
 
 class OrgCreate(BaseModel):
-    name: str = Field(min_length=2, max_length=120)
+    name: Title
 
 
 class OrgOut(BaseModel):
@@ -56,14 +57,14 @@ class MemberOut(BaseModel):
 
 
 class TeammateAdd(BaseModel):
-    phone: str = Field(min_length=6, max_length=20)
-    name: str = Field(min_length=1, max_length=80)
+    phone: PhoneInput
+    name: PersonName
     role: Role
 
 
 class RoomCreate(BaseModel):
     type: RoomType
-    title: str = Field(min_length=2, max_length=120)
+    title: Title
 
 
 class RoomMemberOut(BaseModel):
@@ -141,7 +142,7 @@ def _chat_unavailable(exc: NexconnError) -> HTTPException:
 
 @router.post("/orgs", response_model=OrgOut, status_code=201)
 def create_org(body: OrgCreate, user: User = Depends(current_user), db: Session = Depends(get_db)) -> OrgOut:
-    org = Org(name=body.name.strip())
+    org = Org(name=body.name)
     db.add(org)
     db.flush()
     db.add(Membership(org_id=org.id, user_id=user.id, role=Role.OWNER))
@@ -170,7 +171,7 @@ def add_teammate(org_id: str, body: TeammateAdd, user: User = Depends(current_us
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     mate = db.execute(select(User).where(User.phone_e164 == phone)).scalar_one_or_none()
     if mate is None:
-        mate = User(phone_e164=phone, name=body.name.strip())
+        mate = User(phone_e164=phone, name=body.name)
         db.add(mate)
         db.flush()
     if membership_for(db, mate.id, org_id):
@@ -202,7 +203,7 @@ def new_room(org_id: str, body: RoomCreate, user: User = Depends(current_user), 
              settings: Settings = Depends(get_settings), nexconn: NexconnClient = Depends(get_nexconn)) -> RoomOut:
     require_org_role(db, user, org_id, TEAM_ROLES)
     try:
-        room = create_room(db, nexconn, settings, org_id=org_id, room_type=body.type, title=body.title.strip(),
+        room = create_room(db, nexconn, settings, org_id=org_id, room_type=body.type, title=body.title,
                            creator=user)
     except NexconnError as exc:
         db.rollback()

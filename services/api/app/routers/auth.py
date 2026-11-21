@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.db import get_db, utcnow
 from app.models import Membership, User
+from app.schemas import OtpCode, PersonName, PhoneInput
 from app.security import audit
 from app.security.deps import current_user, rate_limit
 from app.security.otp import LogOtpProvider, OtpError, normalize_phone, request_otp, verify_otp
@@ -21,7 +23,7 @@ otp_provider = LogOtpProvider()
 
 
 class OtpRequest(BaseModel):
-    phone: str = Field(min_length=6, max_length=20)
+    phone: PhoneInput
 
 
 class OtpRequested(BaseModel):
@@ -33,9 +35,9 @@ class OtpRequested(BaseModel):
 
 
 class OtpVerify(BaseModel):
-    phone: str = Field(min_length=6, max_length=20)
-    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
-    name: str | None = Field(default=None, min_length=1, max_length=80)
+    phone: PhoneInput
+    code: OtpCode
+    name: PersonName | None = None
     consent: bool = False
 
 
@@ -64,9 +66,21 @@ def user_out(db: Session, user: User) -> UserOut:
                    orgs=[OrgRef(org_id=m.org_id, org_name=m.org.name, role=m.role) for m in ms])
 
 
+SESSION_HINT_COOKIE = "pk_session"
+
+
 def _set_refresh_cookie(response: Response, token: str, settings: Settings) -> None:
-    response.set_cookie(REFRESH_COOKIE, token, max_age=int(REFRESH_TTL.total_seconds()), httponly=True,
-                        secure=settings.api_base_url.startswith("https"), samesite="lax", path="/api/auth")
+    secure = settings.api_base_url.startswith("https")
+    max_age = int(REFRESH_TTL.total_seconds())
+    response.set_cookie(REFRESH_COOKIE, token, max_age=max_age, httponly=True, secure=secure, samesite="lax",
+                        path="/api/auth")
+    response.set_cookie(SESSION_HINT_COOKIE, "1", max_age=max_age, httponly=False, secure=secure, samesite="lax",
+                        path="/")
+
+
+def _clear_cookies(response: Response) -> None:
+    response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
+    response.delete_cookie(SESSION_HINT_COOKIE, path="/")
 
 
 def _otp_error(exc: OtpError) -> HTTPException:
@@ -104,7 +118,7 @@ def otp_verify(body: OtpVerify, request: Request, response: Response, db: Sessio
         if user is None:
             if not body.name:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please tell us your name")
-            user = User(phone_e164=phone, name=body.name.strip())
+            user = User(phone_e164=phone, name=body.name)
             db.add(user)
             db.flush()
             audit.record(db, "user.signup", actor_user_id=user.id, subject_type="user", subject_id=user.id)
@@ -119,17 +133,23 @@ def otp_verify(body: OtpVerify, request: Request, response: Response, db: Sessio
     return AuthOut(access_token=issued.access_token, user=user_out(db, user))
 
 
-@router.post("/refresh", response_model=AuthOut, dependencies=[Depends(rate_limit("refresh", 60, 600))])
+def _signed_out(detail: str) -> JSONResponse:
+    resp = JSONResponse({"detail": detail}, status_code=status.HTTP_401_UNAUTHORIZED)
+    _clear_cookies(resp)
+    return resp
+
+
+@router.post("/refresh", response_model=AuthOut, dependencies=[Depends(rate_limit("refresh", 60, 600))],
+             responses={401: {"description": "Signed out"}})
 def refresh(request: Request, response: Response, db: Session = Depends(get_db),
-            settings: Settings = Depends(get_settings)) -> AuthOut:
+            settings: Settings = Depends(get_settings)) -> AuthOut | JSONResponse:
     token = request.cookies.get(REFRESH_COOKIE)
     if not token:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
+        return _signed_out("Sign in required")
     try:
         user_id, issued = rotate(db, token, settings.jwt_secret, request.headers.get("user-agent"))
     except SessionError as exc:
-        response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+        return _signed_out(str(exc))
     db.commit()
     _set_refresh_cookie(response, issued.refresh_token, settings)
     user = db.get(User, user_id)
@@ -143,7 +163,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
     if token:
         revoke(db, token)
         db.commit()
-    response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
+    _clear_cookies(response)
 
 
 @me_router.get("/me", response_model=UserOut)

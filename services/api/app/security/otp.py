@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -41,13 +42,26 @@ class LogOtpProvider:
         log.warning("OTP for ***%s: %s (test mode, no SMS sent)", phone_e164[-4:], code)
 
 
-def normalize_phone(raw: str, region: str = "IN") -> str:
-    try:
-        parsed = phonenumbers.parse(raw, region)
-    except phonenumbers.NumberParseException as exc:
-        raise OtpError("Enter a valid mobile number") from exc
-    if not phonenumbers.is_valid_number(parsed):
-        raise OtpError("Enter a valid mobile number")
+MOBILE_TYPES = {phonenumbers.PhoneNumberType.MOBILE, phonenumbers.PhoneNumberType.FIXED_LINE_OR_MOBILE}
+PHONE_ERROR = "Enter a valid 10-digit Indian mobile number"
+
+
+def normalize_phone(raw: str) -> str:
+    """Accepts 98765 43210, 098765 43210 or +91 98765 43210; returns +919876543210. Indian mobiles only."""
+    digits = re.sub(r"\D", "", raw)
+    if raw.strip().startswith("+"):
+        if not digits.startswith("91"):
+            raise OtpError(PHONE_ERROR)
+        digits = digits[2:]
+    elif len(digits) == 11 and digits.startswith("0"):
+        digits = digits[1:]
+    elif len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if not re.fullmatch(r"[6-9]\d{9}", digits):
+        raise OtpError(PHONE_ERROR)
+    parsed = phonenumbers.parse("+91" + digits)
+    if not phonenumbers.is_valid_number(parsed) or phonenumbers.number_type(parsed) not in MOBILE_TYPES:
+        raise OtpError(PHONE_ERROR)
     return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
 

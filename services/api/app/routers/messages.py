@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,13 +13,14 @@ from app.deps import get_nexconn
 from app.domain.rooms import NexconnError, send_text
 from app.integrations.nexconn import NexconnClient
 from app.models import ChatMessage, User
+from app.schemas import MessageText
 from app.security.deps import current_user, rate_limit, room_access
 
 router = APIRouter(prefix="/api/rooms", tags=["messages"])
 
 
 class MessageIn(BaseModel):
-    text: str = Field(min_length=1, max_length=4000)
+    text: MessageText
 
 
 class MessageOut(BaseModel):
@@ -56,7 +57,7 @@ def post_message(room_id: str, body: MessageIn, user: User = Depends(current_use
     if member is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Join the room before posting")
     try:
-        msg = send_text(db, nexconn, room, user, body.text.strip())
+        msg = send_text(db, nexconn, room, user, body.text)
     except NexconnError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Message not delivered. Try again") from exc
     return message_out(msg)

@@ -47,6 +47,17 @@ def test_team_member_must_join_before_posting(client, login_as):
 
 def test_empty_and_oversized_messages_rejected(client, login_as):
     owner, _, _, room = _setup(client, login_as)
-    for text in ["", "x" * 4001]:
+    for text in ["", "   \n  ", "x" * 4001, "bad\x00char"]:
         r = client.post(f"/api/rooms/{room['id']}/messages", json={"text": text}, headers=owner["headers"])
-        assert r.status_code == 422
+        assert r.status_code == 422, repr(text)
+
+
+def test_titles_are_trimmed_and_validated(client, login_as):
+    owner = login_as("9000000001", "Asha")
+    org_id = _org(client, owner)
+    url = f"/api/orgs/{org_id}/rooms"
+    r = client.post(url, json={"type": "deal", "title": "  Logo work  "}, headers=owner["headers"])
+    assert r.status_code == 201 and r.json()["title"] == "Logo work"
+    for title in ["   ", "x", "line\nbreak", "y" * 121]:
+        r = client.post(url, json={"type": "deal", "title": title}, headers=owner["headers"])
+        assert r.status_code == 422, repr(title)

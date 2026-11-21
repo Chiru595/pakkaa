@@ -1,0 +1,59 @@
+# Indicative project price bands for Indian freelancers, used by the fair-price meter.
+pack: rate_bands_in
+version: 1
+as_of: "2026-11-21"
+source: >-
+  Pakkaa seed estimates for a hackathon build, compiled from typical project quotes; not a published survey.
+  The meter always prefers the workspace's own past deals over these bands.
+currency: INR
+disclaimer: "Indicative ranges for information only. Not legal or financial advice."
+categories:
+  logo_design:
+    label: Logo design
+    unit: project
+    keywords: [logo, logomark, wordmark]
+    p25: 8000
+    p50: 20000
+    p75: 45000
+  brand_identity:
+    label: Brand identity kit
+    unit: project
+    keywords: [brand kit, brand identity, branding, brand guidelines, visual identity]
+    p25: 40000
+    p50: 90000
+    p75: 200000
+  website:
+    label: Marketing website
+    unit: project
+    keywords: [website, landing page, web site, wordpress, webflow, shopify]
+    p25: 30000
+    p50: 75000
+    p75: 180000
+  mobile_app:
+    label: Mobile app
+    unit: project
+    keywords: [mobile app, android app, ios app, flutter, react native]
+    p25: 150000
+    p50: 400000
+    p75: 1000000
+  social_media:
+    label: Social media management
+    unit: month
+    keywords: [social media, instagram, reels, content calendar]
+    p25: 15000
+    p50: 30000
+    p75: 60000
+  video_editing:
+    label: Video editing
+    unit: video
+    keywords: [video edit, video editing, youtube video, reel edit]
+    p25: 3000
+    p50: 8000
+    p75: 20000
+  copywriting:
+    label: Copywriting
+    unit: project
+    keywords: [copywriting, copy, blog, articles, content writing]
+    p25: 5000
+    p50: 15000
+    p75: 35000

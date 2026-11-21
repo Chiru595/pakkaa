@@ -65,8 +65,8 @@ def normalize_phone(raw: str) -> str:
     return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
 
-def _hash(pepper: str, phone: str, code: str) -> str:
-    return hmac.new(pepper.encode(), f"{phone}:{code}".encode(), hashlib.sha256).hexdigest()
+def _hash(pepper: str, phone: str, code: str, purpose: str) -> str:
+    return hmac.new(pepper.encode(), f"{purpose}:{phone}:{code}".encode(), hashlib.sha256).hexdigest()
 
 
 @dataclass
@@ -75,11 +75,14 @@ class IssuedOtp:
     code: str
 
 
-def request_otp(db: Session, phone_e164: str, pepper: str, provider: OtpProvider) -> IssuedOtp:
+def request_otp(db: Session, phone_e164: str, pepper: str, provider: OtpProvider,
+                purpose: str = "login") -> IssuedOtp:
+    """`purpose` scopes a code to one action (login, or signing one term-sheet version) so codes never cross over."""
     now = utcnow()
     recent = db.execute(
         select(func.count(), func.max(OtpChallenge.created_at)).where(
-            OtpChallenge.phone_e164 == phone_e164, OtpChallenge.created_at > now - timedelta(hours=1))
+            OtpChallenge.phone_e164 == phone_e164, OtpChallenge.purpose == purpose,
+            OtpChallenge.created_at > now - timedelta(hours=1))
     ).one()
     count, latest = recent
     if latest and now - latest < RESEND_COOLDOWN:
@@ -87,16 +90,18 @@ def request_otp(db: Session, phone_e164: str, pepper: str, provider: OtpProvider
     if count >= MAX_PER_HOUR:
         raise OtpError("Too many codes requested. Try again in an hour", 429)
     code = f"{secrets.randbelow(1_000_000):06d}"
-    db.add(OtpChallenge(phone_e164=phone_e164, code_hash=_hash(pepper, phone_e164, code), expires_at=now + OTP_TTL))
+    db.add(OtpChallenge(phone_e164=phone_e164, purpose=purpose, code_hash=_hash(pepper, phone_e164, code, purpose),
+                        expires_at=now + OTP_TTL))
     db.commit()
     provider.send(phone_e164, code)
     return IssuedOtp(phone_e164, code)
 
 
-def verify_otp(db: Session, phone_e164: str, code: str, pepper: str) -> None:
+def verify_otp(db: Session, phone_e164: str, code: str, pepper: str, purpose: str = "login") -> None:
     now = utcnow()
     challenge = db.execute(
-        select(OtpChallenge).where(OtpChallenge.phone_e164 == phone_e164, OtpChallenge.consumed_at.is_(None))
+        select(OtpChallenge).where(OtpChallenge.phone_e164 == phone_e164, OtpChallenge.purpose == purpose,
+                                   OtpChallenge.consumed_at.is_(None))
         .order_by(OtpChallenge.created_at.desc()).limit(1).with_for_update()
     ).scalar_one_or_none()
     if challenge is None or challenge.expires_at < now:
@@ -104,7 +109,7 @@ def verify_otp(db: Session, phone_e164: str, code: str, pepper: str) -> None:
     if challenge.attempts >= OTP_MAX_ATTEMPTS:
         raise OtpError("Too many wrong codes. Ask for a new one", 429)
     challenge.attempts += 1
-    if not hmac.compare_digest(challenge.code_hash, _hash(pepper, phone_e164, code.strip())):
+    if not hmac.compare_digest(challenge.code_hash, _hash(pepper, phone_e164, code.strip(), purpose)):
         db.commit()
         raise OtpError("Wrong code")
     challenge.consumed_at = now

@@ -92,8 +92,9 @@ def migrated_db():
 def clean_tables():
     reset_rate_limits()
     with get_engine().begin() as conn:
-        conn.execute(text("TRUNCATE chat_messages, audit_events, invites, room_members, rooms, auth_sessions, "
-                          "memberships, otp_challenges, users, orgs RESTART IDENTITY CASCADE"))
+        tables = conn.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                                   "AND tablename <> 'alembic_version'")).scalars().all()
+        conn.execute(text(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE"))
     yield
 
 

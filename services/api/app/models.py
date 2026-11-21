@@ -100,6 +100,7 @@ class OtpChallenge(Base):
     __table_args__ = (Index("ix_otp_phone_created", "phone_e164", "created_at"),)
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     phone_e164: Mapped[str] = mapped_column(String(20))
+    purpose: Mapped[str] = mapped_column(String(80), default="login", server_default="login")
     code_hash: Mapped[str] = mapped_column(String(64))
     expires_at: Mapped[datetime]
     attempts: Mapped[int] = mapped_column(default=0)
@@ -168,3 +169,108 @@ class ChatMessage(Base):
     body: Mapped[str] = mapped_column(Text, default="")
     card: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class TermSheetStatus(StrEnum):
+    DRAFT = "draft"
+    LOCKED = "locked"
+
+
+class TermSheet(Base):
+    __tablename__ = "term_sheets"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), unique=True)
+    version: Mapped[int] = mapped_column(default=1)
+    terms: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    category: Mapped[str | None] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(10), default=TermSheetStatus.DRAFT)
+    locked_hash: Mapped[str | None] = mapped_column(String(64))
+    locked_at: Mapped[datetime | None]
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class TermSheetSignature(Base):
+    __tablename__ = "term_sheet_signatures"
+    __table_args__ = (UniqueConstraint("term_sheet_id", "version", "user_id"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    term_sheet_id: Mapped[str] = mapped_column(ForeignKey("term_sheets.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int]
+    sheet_hash: Mapped[str] = mapped_column(String(64))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    side: Mapped[str] = mapped_column(String(10))
+    method: Mapped[str] = mapped_column(String(10), default="otp")
+    signed_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class ProposalStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+
+
+class TermProposal(Base):
+    """A term the Scribe read from chat. It changes nothing until a person in the room accepts it."""
+
+    __tablename__ = "term_proposals"
+    __table_args__ = (Index("ix_term_proposals_room_status", "room_id", "status"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"))
+    term_key: Mapped[str] = mapped_column(String(30))
+    value: Mapped[Any] = mapped_column(JSONB)
+    quote: Mapped[str] = mapped_column(String(300), default="")
+    source_message_id: Mapped[str | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="SET NULL"))
+    confidence_pct: Mapped[int] = mapped_column(default=0)
+    status: Mapped[str] = mapped_column(String(12), default=ProposalStatus.PENDING)
+    decided_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class CopilotProfile(Base):
+    """Private to one person in one room. Never shown to, or used for, anyone else."""
+
+    __tablename__ = "copilot_profiles"
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    walk_away_paise: Mapped[int | None] = mapped_column(BigInteger)
+    target_paise: Mapped[int | None] = mapped_column(BigInteger)
+    notes: Mapped[str | None] = mapped_column(String(1000))
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class CopilotSuggestion(Base):
+    __tablename__ = "copilot_suggestions"
+    __table_args__ = (Index("ix_copilot_suggestions_user", "user_id", "created_at"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    trigger_message_id: Mapped[str | None] = mapped_column(String(64))
+    options: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    chosen_index: Mapped[int | None]
+    outcome: Mapped[str | None] = mapped_column(String(12))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class PaymentStatus(StrEnum):
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
+
+
+class PaymentLink(Base):
+    __tablename__ = "payment_links"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), index=True)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), index=True)
+    term_sheet_id: Mapped[str] = mapped_column(ForeignKey("term_sheets.id"))
+    term_version: Mapped[int]
+    purpose: Mapped[str] = mapped_column(String(20), default="advance")
+    amount_paise: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String(10), default=PaymentStatus.PENDING)
+    provider: Mapped[str] = mapped_column(String(20), default="simulated")
+    provider_ref: Mapped[str] = mapped_column(String(64), unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    paid_at: Mapped[datetime | None]

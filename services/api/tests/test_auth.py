@@ -9,6 +9,11 @@ PHONE = "9876543210"
 E164 = "+919876543210"
 
 
+def _use_refresh_cookie(client, value):
+    client.cookies.clear()
+    client.cookies.set("pk_refresh", value)
+
+
 def _request(client):
     return client.post("/api/auth/otp/request", json={"phone": PHONE})
 
@@ -91,7 +96,7 @@ def test_concurrent_refresh_within_grace_is_allowed(client, login_as):
     login_as(PHONE)
     old_cookie = client.cookies.get("pk_refresh")
     assert client.post("/api/auth/refresh").status_code == 200
-    client.cookies.set("pk_refresh", old_cookie, path="/api/auth")
+    _use_refresh_cookie(client, old_cookie)
     r = client.post("/api/auth/refresh")
     assert r.status_code == 200
     assert client.get("/api/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"}).status_code == 200
@@ -107,7 +112,7 @@ def test_refresh_rotates_and_reuse_signs_out_family(client, login_as, db):
     db.execute(update(AuthSession).where(AuthSession.replaced_by.is_not(None))
                .values(revoked_at=AuthSession.revoked_at - timedelta(seconds=30)))
     db.commit()
-    client.cookies.set("pk_refresh", old_cookie, path="/api/auth")
+    _use_refresh_cookie(client, old_cookie)
     assert client.post("/api/auth/refresh").status_code == 401
     assert client.get("/api/me", headers={"Authorization": f"Bearer {new_access}"}).status_code == 401
     assert client.get("/api/me", headers=s["headers"]).status_code == 401
@@ -116,7 +121,7 @@ def test_refresh_rotates_and_reuse_signs_out_family(client, login_as, db):
 def test_session_hint_cookie_set_and_cleared(client, login_as):
     login_as(PHONE)
     assert client.cookies.get("pk_session") == "1"
-    client.cookies.set("pk_refresh", "forged", path="/api/auth")
+    _use_refresh_cookie(client, "forged")
     r = client.post("/api/auth/refresh")
     assert r.status_code == 401
     assert 'pk_session=""' in r.headers.get("set-cookie", "") or "pk_session=;" in r.headers.get("set-cookie", "")

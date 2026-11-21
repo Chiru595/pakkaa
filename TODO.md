@@ -17,7 +17,8 @@ milestone must meet these rules:
    key on every money call, hash-chained audit entry on every change.
 4. **Money flows never depend on an LLM.** If Anthropic is down or slow, the copilot degrades and money flows
    keep working.
-5. **Sandbox is labelled.** Mock or sandbox payments show a clear "Test mode" badge. No fake "paid" claims.
+5. **Payments are simulated and labelled.** No payment provider is used. A `PaymentProvider` interface with one
+   `SimulatedProvider` keeps the flow real end to end, and every payment shows a "Simulated" badge.
 6. **Schema changes go through Alembic.** No `create_all` outside tests.
 7. **Org isolation is enforced in the query layer** and tested.
 
@@ -49,7 +50,7 @@ milestone must meet these rules:
 - [ ] Web: Vite, React, TypeScript, Tailwind; mobile-first shell; login, org switcher, room list
 - [ ] CI: GitHub Actions running ruff, mypy, pytest, eslint, tsc and the web build (P)
 - [ ] Deploy on Vercel: web (static) and API (FastAPI as a Python function) in one project; Postgres on Neon
-      via the Vercel Marketplace; migrations run in the build step; Vercel Cron polls payment status (P)
+      via the Vercel Marketplace; migrations run in the build step (P)
 - **Done when:** a freelancer and a guest client chat in a Deal Room from two phones on the deployed URL.
 
 ## M1 Deal Room with live AI (2 h)
@@ -66,9 +67,8 @@ milestone must meet these rules:
 - [ ] Lock review: missing or risky terms before lock
 - [ ] Lock and sign: OTP from both parties; version plus SHA-256 of the canonical JSON; any later change
       needs both again
-- [ ] Advance payment link through `PaymentProvider` (PaytmSandbox, RazorpayTest, Mock fallback)
-- [ ] Payment webhooks with signature verification, plus a status poller as backup; card updates from
-      provider status only (P)
+- [ ] Advance payment link through `SimulatedProvider` (hosted pay page, then paid or failed status)
+- [ ] Card updates only from provider status, never from chat text (P)
 - [ ] Ported from PaidSafe: `interest.py`, `factcheck.py`, `evidence.py`, rule packs, their tests
 
 ## M2 Pay Lane with live AI (2 h)
@@ -85,7 +85,7 @@ milestone must meet these rules:
 - [ ] Verify call through the Call SDK to the approver's verified in-app account; challenge questions from
       internal org data only; never asks for OTP, PIN or password; call summary attached to the card
 - [ ] Two-key kill switch: anyone freezes; unfreeze needs two approvers; every payout checks freeze first
-- [ ] Payout through `PaymentProvider` with an idempotency key (unique constraint in the DB) (P)
+- [ ] Payout through `SimulatedProvider` with an idempotency key (unique constraint in the DB) (P)
 - [ ] Bank and VPA details encrypted at rest (versioned key) and masked to the last 4 everywhere (P)
 - [ ] Ask Pakkaa: per-user Q&A over the org's own data, scoped to what that user may see
 
@@ -111,7 +111,6 @@ milestone must meet these rules:
   - [ ] Same payout sent twice: paid once
   - [ ] Audit chain tampered: verification fails
   - [ ] User in org A cannot read or act on org B's rooms, cards or memory (P)
-  - [ ] Forged or replayed payment webhook: rejected (P)
   - [ ] Payout while frozen: refused (P)
 
 ## M5 Demo polish (remaining time)

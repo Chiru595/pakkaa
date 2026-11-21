@@ -11,7 +11,9 @@ hello-world build · **fallback** = what we do instead.
 | Chat SDK | `@nexconn/engine`, `@nexconn/chat` | https://docs.nexconn.ai/chatsdk-web |
 | Chat UI kit (optional, Lit web components, ESM only, no CDN) | `@nexconn/chatui` + `lit@^3.3.2` | https://docs.nexconn.ai/chatui-web/quickstart |
 
-Pinned set: `@nexconn/engine@26.5.1` and `@nexconn/chat@26.5.1` (chat requires the exact same engine version).
+Pinned set: `@nexconn/engine@26.2.0` and `@nexconn/chat@26.2.0` (chat requires the exact same engine version).
+26.5.1 also works, but its client uploads diagnostic logs to `logcollection.ronghub.com`, which browsers block
+with a CORS error on every page; 26.2.0 does not, so we stay on it.
 We render our own UI with React, so the UI kit is not needed.
 
 Init: `NCEngine.initialize({ appKey, areaCode: AreaCode.SG })` exactly once, then

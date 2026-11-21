@@ -2,20 +2,97 @@
 
 **Deal pakkaa! Payment pakkaa!**
 
-Pakkaa is the money layer for business conversations, for Indian freelancers, agencies and small suppliers.
+*Pakkaa (Hindi): settled, certain.*
+
+Pakkaa is the money layer for business conversations, for Indian freelancers, agencies and small suppliers. Deals
+are agreed in chat and payment instructions arrive in chat, but no tool in that chat protects the money. Pakkaa
+does: it turns what people agree into a signed term sheet, and turns every payment request into a verified,
+risk-checked card that a chat message can never execute.
 
 - **Deal Room (money in):** freelancer and client negotiate in one room, each with a private AI copilot. Agreed
-  terms fill a live term sheet, both sides lock it with OTP, and the advance is requested through a payment link.
+  terms fill a live term sheet, both sides sign it with OTP, and the advance is requested through a payment link.
 - **Pay Lane (money out):** the team's only valid channel for outgoing payments. Payment cards come only from
   verified people, are risk-checked, re-confirmed by the requester with an OTP when risky, approved by two people,
   then paid.
-- **It learns:** late payers, deal outcomes, Scribe corrections and payout history shape the next negotiation and
-  the next risk check. Learning only ever makes checks stricter.
+- **It learns:** late payers, deal outcomes, corrections and payout history shape the next negotiation and the
+  next risk check. Learning only ever makes checks stricter.
 
 Everyday chat stays on WhatsApp or Slack. Pakkaa is where money is decided.
 
-Live: **https://pakkaa-atozz.vercel.app** (demo mode: login codes are shown on screen, payments are simulated).
-Built on [Nexconn](https://www.nexconn.ai) Chat. Nothing here is legal or financial advice.
+**Live:** https://pakkaa-atozz.vercel.app (demo mode: login codes are shown on screen, payments are simulated).
+Built at the Paytm Buildathon (Beyond 9to5, Bengaluru, 21 Nov 2026), Track 3, on [Nexconn](https://www.nexconn.ai)
+Chat. Nothing here is legal or financial advice.
+
+## The problem
+
+Small Indian businesses lose money at two moments, and both happen in chat.
+
+### Money in: deals agreed in chat get paid late, or not at all
+
+A freelancer and a client agree price, advance and scope across a WhatsApp thread. Nothing is written down, the
+advance is "coming tomorrow", and when the work is done the client goes quiet. Razorpay's
+[Fix My Itch](https://razorpay.com/m/fix-my-itch/) (problem statements gathered from about 50,000 inputs and scored
+on severity, frequency and market size) ranks this at the top of B2B services [1][2]:
+
+| Fix My Itch problem (exact wording) | Itch score | What Pakkaa does |
+|---|---|---|
+| Why can't SMEs negotiate favorable payment terms with large buyers? | **82.8** (highest in B2B Services) | A private copilot per side, a fair-price meter and a term sheet both sides sign |
+| Why do freelancers ghost projects after partial payments without accountability systems? | **76** | Every agreed term is signed with OTP and kept with the chat message it came from |
+| Why can't businesses verify new suppliers before purchasing? | **76** | Payees are checked and scored before any money moves |
+| Why do micro-SMEs waste 10+ hours weekly on invoice management? | **67.5** | Terms, advance link and payment status live in one room |
+
+The numbers behind it:
+
+- **₹33,005 crore** is payable in 1,20,314 delayed-payment cases filed by micro and small enterprises with the MSE
+  Facilitation Councils (MSME Samadhaan, accessed 21 Nov 2026) [3].
+- **₹7.34 lakh crore** of payments to MSMEs were delayed as of March 2024 (GAME, FISME and C2FO) [4].
+- **85%** of freelancers are paid late at least some of the time (Remote, 2025) [5]. **54%** wait more than a
+  week to be paid and **35%** were delayed or ghosted at the contract stage (Smallpdf, 2026) [6].
+- **61%** of Indian freelancers surveyed had not been paid at least once in their career (PayPal India, 2018) [7].
+- India's gig workforce is projected to grow from **7.7 million to 23.5 million** by 2029-30 (NITI Aayog) [8].
+
+### Money out: a "boss" on WhatsApp asks for an urgent transfer
+
+- In June 2026 a Mumbai company lost **₹10.4 crore in 63 transfers** over 12 days. A WhatsApp message from an
+  unknown number used the executive director's photo, asked to be saved as a "personal contact", said he was in an
+  "urgent meeting" and told the accounts manager not to tell anyone [9].
+- The same pattern (new number, the director's photo, urgency, secrecy) cost firms **₹1.98 crore** in Mumbai
+  (Aug 2026), **₹1.95 crore** in Nagpur (Jan 2025) and **₹1.9 crore** in Pune (Mar 2025) [10][11][12].
+- Indians lost **₹22,845.73 crore** to cyber fraud in 2024, three times the 2023 figure (Ministry of Home Affairs,
+  Lok Sabha reply) [13].
+- Globally, business email compromise cost **$3.05 billion** in 2025, and the FBI's definition now includes phone
+  numbers and messaging, not only email [14]. **74%** of organisations faced it in 2025; fraudsters "primarily
+  impersonate vendors or executives to request changes to payment instructions" (AFP, 2026) [15].
+
+## The gap
+
+| Today's tools | What they do | What they miss |
+|---|---|---|
+| WhatsApp, Slack | Where deals are agreed and payment instructions arrive | No term capture, no approvals, no way to tell the real boss from a lookalike |
+| Payment links (Razorpay, Paytm) | Collect money, including advances | Know nothing about what was agreed |
+| Payouts with approvals (RazorpayX) [16] | Multi-level approvals, bank and UPI verification | Start after someone has already typed the request in; never see the chat it came from |
+| Invoicing (Zoho Invoice, Vyapar, Refrens) | Bill and chase after the deal | Don't capture the negotiation or guard outgoing money |
+| Marketplaces (Upwork, Fiverr) | Escrow | Only for deals made on the marketplace, with fees |
+| E-signature (Docusign) | Sign a finished document | Not linked to the conversation or to the payment |
+| AP automation (Bill.com, Tipalti, Trustpair) | Vendor checks and approval rules | Built for finance teams working from invoices and email, not 3-person teams on chat |
+
+Every tool works either before the conversation (contracts) or after it (invoices, payouts). In each impersonation
+case above, the instruction arrived as a chat message and the controls never saw it. **Pakkaa sits inside the
+conversation:** it turns what people agree into signed terms, and turns payment requests into verified,
+risk-checked cards that chat text can never execute.
+
+## Key features
+
+| | Feature | The problem it answers |
+|---|---|---|
+| 1 | **Two private copilots in one room.** Each side gets three live reply options with a tactic (hold price, trade scope, ask a question) and a one-line why. Neither copilot ever sees the other side's limits, notes or suggestions. | Small sellers negotiating alone against bigger buyers (Fix My Itch 82.8) |
+| 2 | **Chat becomes a signed term sheet.** The Scribe reads the chat and proposes price, advance, timeline and revisions, quoting the message each came from; a person confirms each one. Both sides sign the exact version with an OTP and a SHA-256 fingerprint; any later change needs both again. A pre-send check warns before you reply below your walk-away price. | Deals agreed in chat, then disputed or ghosted (Fix My Itch 76) |
+| 3 | **Pakkaa remembers who pays late.** When a known client joins a new deal, only your side sees a heads-up such as "paid the last advance 15 days late". A fair-price meter compares the offer with your own past deals. | Late payment, ₹33,005 crore stuck in MSME delayed-payment cases |
+| 4 | **Chat can never move money.** A payment instruction typed in chat becomes an unverified draft that can never be approved or paid. Payments start only as cards raised by verified team members, and a lookalike account using the owner's name is flagged. | The "fake boss on WhatsApp" fraud (₹10.4 crore, Mumbai, June 2026) |
+| 5 | **Risky payments need more proof.** Rules in code score every card with evidence: new payee, changed bank details, urgency or secrecy words, above-usual amount, split payments, off-hours, mismatch with the agreed deal. High-risk cards need a step-up OTP from the requester for that exact amount and account, then approvals by amount band; nobody approves their own card and any edit resets approvals. | Changed payment instructions, the core of business email compromise |
+| 6 | **Kill switch and tamper-evident audit.** Anyone on the team can freeze all payouts; unfreezing needs two different people. Every change is written to a hash-chained audit log that can be exported and verified without the database. | Proving who approved what, after the fact |
+
+The AI advises and the code decides: no model output can sign, approve, pay or change a role.
 
 ## See it work
 
@@ -69,7 +146,7 @@ Screens from a real two-phone run of the demo script (demo mode, simulated payme
 |---|---|
 | <img src="docs/screenshots/15-ask-pakkaa.png" width="360"> | <img src="docs/screenshots/16-learning-and-audit.png" width="360"> |
 
-## Features
+## All features
 
 **Deal Room**
 - Term sheet card pinned in the room; every term keeps the chat message it came from.
@@ -200,7 +277,8 @@ Prerequisites: Git, Python 3.12, Node.js 20 or newer.
    npm run dev
    ```
 
-6. Open http://localhost:5173. In development the one-time code is shown on screen (no SMS is sent).
+6. Open http://localhost:5173. In development the one-time code is shown on screen (no SMS is sent). To also see
+   the **Demo guide** button, set `DEMO_MODE=true` in `.env` and restart the API.
 
 After a restart, run `scripts\dev_db.py` again (if you use the embedded database), then steps 4 and 5.
 
@@ -216,14 +294,40 @@ npx tsc -b
 
 112 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
 set `TEST_DATABASE_URL`), with every model request mocked. They include the red-team cases: impostor payouts, chat
-commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required), copilot privacy between
-sides, double payouts, audit tampering, cross-org access, payouts while frozen, and learning never loosening.
+commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required),
+copilot privacy between sides, double payouts, audit tampering, cross-org access, payouts while frozen, and learning
+never loosening.
 
 ## Limitations
 
 - Payments are simulated (no payment provider in this build); every payment is labelled "Simulated".
 - Demo mode shows login codes on screen; production use needs an SMS provider with DLT-registered templates.
 - Rate bands are indicative seed estimates with source and date, not a published survey.
+
+## Sources
+
+1. Razorpay, *Fix My Itch*, problem list and itch scores (accessed 21 Nov 2026). https://razorpay.com/m/fix-my-itch/#all-problems
+2. The Shorty Awards (18th), *Razorpay Fix My Itch* (method: AI-gathered and surveyed inputs, scored on severity,
+   frequency and potential market size). https://shortyawards.com/18th/razorpay-fix-my-itch
+3. Ministry of MSME, *MSME Samadhaan* dashboard (accessed 21 Nov 2026). https://samadhaan.msme.gov.in/MyMsme/MSEFC/MSEFC_Welcome.aspx
+4. Free Press Journal, *Quantum of delayed payments to MSMEs steadily declines to ₹7.34 lakh crore* (26 Nov 2025).
+   https://www.freepressjournal.in/business/quantum-of-delayed-payments-to-msmes-steadily-declines-to-734-lakh-crore-roars-positive-impact-of-policy-measures
+5. Remote, *Reversing late payment culture* (Contractor Management Report 2025, 19 Feb 2025). https://remote.com/blog/reversing-late-payment-culture
+6. ContentGrip on the Smallpdf Freelancer Freedom Index 2026 (1 Jul 2026). https://www.contentgrip.com/freelancer-admin-ai-gap/
+7. Inc42 on the PayPal India Freelancer Report (15 Jan 2018). https://inc42.com/features/paypal-freelancers-digital-payments
+8. NITI Aayog, *India's Booming Gig and Platform Economy* (27 Jun 2022). https://www.niti.gov.in/sites/default/files/2022-06/Policy_Brief_India's_Booming_Gig_and_Platform_Economy_27062022.pdf
+9. Business Today, *63 transactions, ₹10 crore gone: how a fake WhatsApp message fooled a company* (18 Jun 2026).
+   https://businesstoday.in/latest/trends/story/63-transactions-rs10-crore-gone-how-a-fake-whatsapp-message-fooled-a-company-537698-2026-06-18
+10. Free Press Journal, *Firm duped of ₹1.98 crore in WhatsApp director impersonation scam* (6 Aug 2026).
+    https://www.freepressjournal.in/mumbai/mumbai-cyber-fraud-firm-duped-of-198-crore-in-whatsapp-director-impersonation-scam-fir-registered
+11. Free Press Journal, *Accountant duped of ₹1.95 crore by fraudster posing as director* (17 Jan 2025).
+    https://www.freepressjournal.in/mumbai/maharashtra-54-year-old-accountant-duped-of-195-crore-by-fraudster-posing-as-director-in-fake-whatsapp-call-scam-case-registered
+12. Free Press Journal, *Accountant duped of ₹1.9 crore in WhatsApp DP fraud* (21 Mar 2025).
+    https://www.freepressjournal.in/mumbai/maharashtra-news-72-year-old-accountant-duped-of-19-crore-in-whatsapp-dp-fraud-after-scammer-poses-as-company-director
+13. YourStory on the Ministry of Home Affairs reply in the Lok Sabha (22 Jul 2025). https://yourstory.com/2025/07/citizens-lost-over-rs-22845-cr-to-cyber-criminals-in-2024
+14. FBI Internet Crime Complaint Center, *2025 Internet Crime Report* (Apr 2026). https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf
+15. AFP, *2026 Payments Fraud and Control Survey* (14 Apr 2026). https://www.financialprofessionals.org/about/learn-more/press-releases/Details/over-75-percent-of-us-firms-experienced-payments-fraud-in-2025-while-ai-adoption-for-fraud-mitigation-lags
+16. Razorpay, *RazorpayX Payouts* (approval workflows and account verification). https://razorpay.com/x/payouts/
 
 ## Prior work
 

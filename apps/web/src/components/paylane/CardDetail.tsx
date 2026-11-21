@@ -192,7 +192,7 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
                 <span className="text-slate-500">Requested by </span>
                 <strong>{card.requester?.name ?? 'unknown'}</strong>{' '}
                 {card.requester?.verified ? <Badge tone="green">Verified team</Badge> : <Badge tone="red">Not verified</Badge>}
-                {card.requester && card.requester.name_collisions.length > 0 && (
+                {card.requester && !card.requester.verified && card.requester.name_collisions.length > 0 && (
                   <span className="mt-1 block text-xs font-semibold text-red-700">
                     ⚠ Same name as {card.requester.name_collisions[0].name} (
                     {ROLE_LABEL[card.requester.name_collisions[0].role as Role] ?? card.requester.name_collisions[0].role}), a

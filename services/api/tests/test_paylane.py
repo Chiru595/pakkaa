@@ -279,7 +279,7 @@ def test_money_talk_without_ai_still_captures_unverified_draft(client, team, llm
 def test_freeze_blocks_everything_and_needs_two_keys(client, team):
     card = new_card(client, team, amount=500_000)
     org = team["org"]
-    assert client.post(f"/api/orgs/{org}/freeze", json={"reason": "Suspicious call"},
+    assert client.post(f"/api/orgs/{org}/freeze", json={"reason": "Suspicious request"},
                        headers=team["member"]["headers"]).json()["frozen"]
     assert act(client, team, "finance", card, "approve", version=1).status_code == 423
     assert client.post(f"/api/rooms/{team['lane']['id']}/cards",

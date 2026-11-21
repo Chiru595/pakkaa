@@ -76,6 +76,12 @@ function AuditBox({ orgId }: { orgId: string }) {
   )
 }
 
+/** A deal outcome is stored once for the playbook and once per client profile; show it once. */
+function withoutDuplicates(entries: MemoryEntry[]): MemoryEntry[] {
+  const playbookSources = new Set(entries.filter((e) => e.kind === 'playbook').map((e) => e.source))
+  return entries.filter((e) => e.kind === 'playbook' || !playbookSources.has(e.source))
+}
+
 export default function LearningPanel({ orgId, canAudit }: { orgId: string; canAudit: boolean }) {
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [memory, setMemory] = useState<MemoryEntry[] | null>(null)
@@ -85,7 +91,7 @@ export default function LearningPanel({ orgId, canAudit }: { orgId: string; canA
     Promise.all([PayApi.policy(orgId), PayApi.memory(orgId)])
       .then(([p, m]) => {
         setPolicy(p)
-        setMemory(m)
+        setMemory(withoutDuplicates(m))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load'))
   }, [orgId])

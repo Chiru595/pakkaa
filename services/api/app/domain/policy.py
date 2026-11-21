@@ -31,7 +31,7 @@ TUNABLES: dict[str, Tunable] = {
     "medium_at": Tunable("Medium-risk score threshold", True, 15, 60),
     "baseline_multiplier": Tunable("Above-usual amount multiplier", True, 1.1, 3.0, integer=False),
     "bank_change_window_days": Tunable("Days a bank change stays risky", False, 7, 120),
-    "no_baseline_large_rupees": Tunable("Large first payment (rupees)", True, 5000, 500000),
+    "no_baseline_large_rupees": Tunable("Large first payment", True, 5000, 500000),
 }
 LEARNING_STEP = 5
 MIN_REASON = 10

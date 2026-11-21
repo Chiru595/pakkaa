@@ -97,3 +97,20 @@ def test_advance_link_after_lock_is_simulated_and_idempotent(client, login_as, s
     assert client.get("/api/pay/short").status_code == 404
     assert client.post(f"/api/pay/{token}/simulate", json={"outcome": "refund"}).status_code == 422
     assert sum(1 for c in nexconn.calls if c[0] == "send_card" and c[1][2]["kind"] == "payment_status") == 1
+
+
+def test_stale_scribe_suggestions_close_on_matching_edit_and_on_lock(client, login_as, sent_codes, llm):
+    from tests.test_deal_room import say
+
+    owner, guest, _, room = setup_deal(client, login_as)
+    llm.queue("scribe", {"proposals": [
+        {"term_key": "price_paise", "value": "50k", "confidence": 0.9, "quote": "50k"},
+        {"term_key": "revisions", "value": "3", "confidence": 0.9, "quote": "3 revisions"},
+    ]})
+    say(client, guest, room, "50k and 3 revisions?")
+    assert {p["term_key"] for p in deal(client, owner, room)["proposals"]} == {"price_paise", "revisions"}
+    sheet = agree(client, owner, room)
+    assert [p["term_key"] for p in deal(client, owner, room)["proposals"]] == ["revisions"]
+    assert sign(client, owner, room, sheet, sent_codes, "+919000000001").status_code == 200
+    locked = sign(client, guest, room, sheet, sent_codes, "+919000000003").json()
+    assert locked["term_sheet"]["status"] == "locked" and locked["proposals"] == []

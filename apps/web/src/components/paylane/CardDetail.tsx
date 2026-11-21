@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
+import { ROLE_LABEL, type Role } from '../../lib/api'
 import { parseRupees } from '../../lib/deal'
 import { type Brief, type Card, newIdempotencyKey, PayApi, STATE_LABEL, type StepUpRequest } from '../../lib/paylane'
 import { Badge, Button, ErrorText } from '../ui'
@@ -43,7 +44,8 @@ function StepUp({ card, onDone }: { card: Card; onDone: (c: Card) => void }) {
     <section className="space-y-2 rounded-2xl border border-red-200 bg-red-50/60 p-3" aria-label="Step-up check">
       <h3 className="text-sm font-semibold text-red-900">Step-up check: confirm this exact card</h3>
       <p className="text-sm text-red-900">
-        High risk. Confirm <strong>{card.amount_display}</strong> to{' '}
+        {card.signals.some((s) => s.rule_id === 'bank_changed') ? "The payee's bank details changed recently. " : 'High risk. '}
+        Confirm <strong>{card.amount_display}</strong> to{' '}
         <strong>{card.payee ? `${card.payee.name} · ${card.payee.masked}` : 'this payee'}</strong> with the one-time code
         sent to your verified phone. Approvers can act only after this.
       </p>
@@ -192,7 +194,8 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
                 {card.requester?.verified ? <Badge tone="green">Verified team</Badge> : <Badge tone="red">Not verified</Badge>}
                 {card.requester && card.requester.name_collisions.length > 0 && (
                   <span className="mt-1 block text-xs font-semibold text-red-700">
-                    ⚠ Same name as {card.requester.name_collisions[0].name} ({card.requester.name_collisions[0].role}), a
+                    ⚠ Same name as {card.requester.name_collisions[0].name} (
+                    {ROLE_LABEL[card.requester.name_collisions[0].role as Role] ?? card.requester.name_collisions[0].role}), a
                     different account
                   </span>
                 )}
@@ -240,7 +243,7 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
                 {card.owner_approval_required ? ' (owner required)' : ''}
               </h3>
               {card.approvals.map((a) => (
-                <p key={a.name}>✓ {a.name} ({a.role})</p>
+                <p key={a.name}>✓ {a.name} ({ROLE_LABEL[a.role as Role] ?? a.role})</p>
               ))}
               {card.step_up_required && card.step_up_done && (
                 <p className="text-emerald-800">
@@ -253,7 +256,9 @@ export default function CardDetail({ cardId, onClose, onChanged }: { cardId: str
               )}
             </section>
 
-            {card.viewer.blocked_reason && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{card.viewer.blocked_reason}</p>}
+            {card.viewer.blocked_reason && !card.viewer.can_step_up && (
+              <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{card.viewer.blocked_reason}</p>
+            )}
             {card.viewer.can_step_up && <StepUp card={card} onDone={update} />}
 
             <div className="grid gap-2">

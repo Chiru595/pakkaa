@@ -52,10 +52,25 @@ def current_hash(sheet: TermSheet) -> str:
     return T.sheet_hash(sheet.room_id, sheet.version, sheet.terms)
 
 
+def close_pending_proposals(db: Session, room: Room, *, key: str | None = None, value: Any = None) -> int:
+    """Supersedes pending Scribe suggestions: all of them, or only those for `key` that `value` already matches."""
+    q = select(TermProposal).where(TermProposal.room_id == room.id, TermProposal.status == ProposalStatus.PENDING)
+    if key is not None:
+        q = q.where(TermProposal.term_key == key)
+    closed = 0
+    for p in db.execute(q).scalars():
+        if key is not None and p.value != value:
+            continue
+        p.status = ProposalStatus.SUPERSEDED
+        closed += 1
+    return closed
+
+
 def set_term(db: Session, room: Room, sheet: TermSheet, key: str, raw: Any, actor: User, *, via: str,
              source_message_ids: list[str] | None = None) -> bool:
     """Validates and applies one term. Any change bumps the version and voids an earlier lock."""
     value = T.coerce_value(key, raw)
+    close_pending_proposals(db, room, key=key, value=value)
     existing = sheet.terms.get(key) or {}
     if existing.get("value") == value:
         return False

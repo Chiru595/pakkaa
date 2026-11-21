@@ -17,11 +17,57 @@ Everyday chat stays on WhatsApp or Slack. Pakkaa is where money is decided.
 Live: **https://pakkaa-atozz.vercel.app** (demo mode: login codes are shown on screen, payments are simulated).
 Built on [Nexconn](https://www.nexconn.ai) Chat. Nothing here is legal or financial advice.
 
-| Deal Room: private heads-up | Copilot (freelancer) | Copilot (client) | Pre-send check |
-|---|---|---|---|
-| ![](docs/screenshots/02-heads-up.png) | ![](docs/screenshots/03-copilot-asha.png) | ![](docs/screenshots/04-copilot-ravi.png) | ![](docs/screenshots/05-presend-warning.png) |
-| **Term sheet and fair price** | **Impostor blocked** | **Verify call** | **What Pakkaa learned** |
-| ![](docs/screenshots/07-term-sheet.png) | ![](docs/screenshots/10-impostor-blocked.png) | ![](docs/screenshots/12-verify-call.png) | ![](docs/screenshots/14-learning.png) |
+## See it work
+
+Screens from a real two-phone run of the demo script (demo mode, simulated payments).
+
+**Sign in and workspace**
+
+| Phone OTP sign-in (test mode shows the code) | Acme Studio workspace with Ask Pakkaa |
+|---|---|
+| <img src="docs/screenshots/01-login.png" width="360"> | <img src="docs/screenshots/02-workspace.png" width="360"> |
+
+**Deal Room: money in**
+
+<img src="docs/screenshots/03-private-heads-up.png" width="760"><br>
+*Ravi joins. Asha privately sees that he paid the last advance late; Ravi never sees it.*
+
+<img src="docs/screenshots/04-private-copilots.png" width="760"><br>
+*Each side gets its own copilot with different reply options; neither sees the other's.*
+
+| Pre-send check warns below the walk-away price | Scribe turns chat into terms a person confirms |
+|---|---|
+| <img src="docs/screenshots/05-pre-send-check.png" width="360"> | <img src="docs/screenshots/06-scribe-proposals.png" width="360"> |
+
+<img src="docs/screenshots/07-term-sheet-fair-price.png" width="360"><br>
+*Term sheet with the fair-price meter and the checks to finish before locking.*
+
+<img src="docs/screenshots/08-otp-sign-and-lock.png" width="760"><br>
+*Both sides sign the exact version with an OTP; the sheet locks with its SHA-256.*
+
+<img src="docs/screenshots/09-advance-paid.png" width="760"><br>
+*Ravi pays the advance through the (simulated) payment link; the room shows it received.*
+
+**Pay Lane: money out**
+
+<img src="docs/screenshots/10-impostor-blocked.png" width="760"><br>
+*An impostor using the owner's name asks for money in chat: it becomes an unverified draft at risk 100.*
+
+| Step-up check: the requester confirms the exact card with an OTP | Approver brief, risk rules and the step-up result |
+|---|---|
+| <img src="docs/screenshots/11-step-up-check.png" width="360"> | <img src="docs/screenshots/12-approver-brief.png" width="360"> |
+
+<img src="docs/screenshots/13-two-approvals-paid.png" width="360"><br>
+*Two approvals, then a one-time (simulated) payout.*
+
+<img src="docs/screenshots/14-kill-switch.png" width="760"><br>
+*Anyone can freeze all payments; unfreezing needs two different approvers.*
+
+**Answers and learning**
+
+| Ask Pakkaa answers from the workspace's own records | What Pakkaa learned, and the audit chain verified |
+|---|---|
+| <img src="docs/screenshots/15-ask-pakkaa.png" width="360"> | <img src="docs/screenshots/16-learning-and-audit.png" width="360"> |
 
 ## Features
 
@@ -168,7 +214,7 @@ cd ..\..\apps\web
 npx tsc -b
 ```
 
-107 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
+112 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
 set `TEST_DATABASE_URL`), with every model request mocked. They include the red-team cases: impostor payouts, chat
 commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required), copilot privacy between
 sides, double payouts, audit tampering, cross-org access, payouts while frozen, and learning never loosening.

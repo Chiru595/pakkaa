@@ -11,7 +11,14 @@ from app.config import Settings, get_settings
 from app.db import get_db, utcnow
 from app.deps import get_llm_dep, get_nexconn
 from app.domain import terms as T
-from app.domain.deal import current_hash, get_sheet, require_deal_room, require_participant, signatures
+from app.domain.deal import (
+    close_pending_proposals,
+    current_hash,
+    get_sheet,
+    require_deal_room,
+    require_participant,
+    signatures,
+)
 from app.domain.rooms import post_card
 from app.integrations.nexconn import NexconnClient
 from app.llm import LLM
@@ -130,8 +137,10 @@ def sign(room_id: str, body: SignIn, user: User = Depends(current_user), db: Ses
     locked = {RoomSide.PROVIDER.value, RoomSide.CLIENT.value} <= sides
     if locked:
         sheet.status, sheet.locked_hash, sheet.locked_at = TermSheetStatus.LOCKED, body.hash, utcnow()
+        closed = close_pending_proposals(db, room)
         audit.record(db, "term_sheet.locked", actor_user_id=user.id, org_id=room.org_id, subject_type="term_sheet",
-                     subject_id=sheet.id, payload={"version": sheet.version, "hash": body.hash})
+                     subject_id=sheet.id, payload={"version": sheet.version, "hash": body.hash,
+                                                   "suggestions_closed": closed})
     db.commit()
     if locked:
         title = f"Term sheet v{sheet.version} locked by both sides. SHA-256 {body.hash[:12]}…"

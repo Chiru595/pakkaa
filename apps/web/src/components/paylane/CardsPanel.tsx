@@ -181,11 +181,12 @@ function AddPayee({ orgId, onAdded }: { orgId: string; onAdded: () => void }) {
   )
 }
 
-export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }: {
+export default function CardsPanel({ roomId, orgId, role, focusCardId, refreshKey = 0, onClose }: {
   roomId: string
   orgId: string
   role: string
   focusCardId: string | null
+  refreshKey?: number
   onClose: () => void
 }) {
   const [cards, setCards] = useState<Card[] | null>(null)
@@ -209,7 +210,7 @@ export default function CardsPanel({ roomId, orgId, role, focusCardId, onClose }
 
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, refreshKey])
 
   async function toggleFreeze() {
     setError(null)

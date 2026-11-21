@@ -164,6 +164,7 @@ export default function RoomPage() {
   const [chosen, setChosen] = useState<Chosen | null>(null)
   const [showCards, setShowCards] = useState(false)
   const [focusCard, setFocusCard] = useState<string | null>(null)
+  const [laneTick, setLaneTick] = useState(0)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const myChatId = user ? `u${user.id}` : ''
   const myChatIdRef = useRef(myChatId)
@@ -194,6 +195,9 @@ export default function RoomPage() {
         setRoom(r)
         unsubscribe = subscribe(r.channel_id, (incoming) => {
           setLines((prev) => mergeLines(prev, incoming))
+          if (incoming.some((l) => l.kind === 'card' && (l.card?.kind === 'payment_card' || l.card?.kind === 'control'))) {
+            setLaneTick((n) => n + 1)
+          }
           if (incoming.some((l) => l.kind === 'card' && l.card?.kind === 'system')) {
             Api.room(roomId).then((fresh) => !cancelled && setRoom(fresh)).catch(() => undefined)
           }
@@ -422,7 +426,7 @@ export default function RoomPage() {
         </form>
         {showMembers && room && <MembersSheet room={room} onClose={() => setShowMembers(false)} />}
         {showCards && room && myRole && (
-          <CardsPanel roomId={room.id} orgId={room.org_id} role={myRole} focusCardId={focusCard} onClose={() => setShowCards(false)} />
+          <CardsPanel roomId={room.id} orgId={room.org_id} role={myRole} focusCardId={focusCard} refreshKey={laneTick} onClose={() => setShowCards(false)} />
         )}
         {showSheet && deal && (
           <TermSheetPanel

@@ -1,10 +1,11 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
-import { Badge, Button, ErrorText, Field, Logo, Screen } from '../components/ui'
-import { Api, ROLE_LABEL, type Room, type RoomType, TEAM_ROLES } from '../lib/api'
+import { Badge, Button, ErrorText, Field, Logo, Screen, VerifiedBadge } from '../components/ui'
+import { Api, ROLE_LABEL, type Room, type RoomType, TEAM_ROLES, type TeamMember } from '../lib/api'
 import { type AskAnswer, PayApi } from '../lib/paylane'
 import { useAuth } from '../lib/auth'
+import { digitsOnlyPhone, formatPhone } from '../lib/phone'
 
 function CreateOrg() {
   const { reload } = useAuth()
@@ -103,6 +104,113 @@ function NewRoom({ orgId, onCreated }: { orgId: string; onCreated: (room: Room) 
         </Button>
       </div>
     </form>
+  )
+}
+
+function TeamSection({ orgId }: { orgId: string }) {
+  const [members, setMembers] = useState<TeamMember[] | null>(null)
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [role, setRole] = useState<'finance' | 'member'>('finance')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [added, setAdded] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    Api.members(orgId)
+      .then(setMembers)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load the team'))
+  }, [orgId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    setAdded(null)
+    try {
+      const m = await Api.addTeammate(orgId, { name: name.trim(), phone: `+91${phone}`, role })
+      setAdded(`${m.name} added as ${ROLE_LABEL[m.role]}. They sign in with +91 ${formatPhone(phone)} to join.`)
+      setName('')
+      setPhone('')
+      setOpen(false)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add the teammate')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const team = members?.filter((m) => TEAM_ROLES.includes(m.role)) ?? []
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Team</h2>
+        {!open && (
+          <button type="button" className="text-sm font-semibold text-brand" onClick={() => setOpen(true)}>
+            + Add teammate
+          </button>
+        )}
+      </div>
+      {members === null ? (
+        <p className="px-2 text-sm text-slate-400">Loading…</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 px-2">
+          {team.map((m) => (
+            <li key={m.user_id} className="flex items-center justify-between py-2 text-sm">
+              <span>
+                <span className="font-medium text-ink">{m.name}</span>{' '}
+                <span className="text-slate-500">
+                  · {ROLE_LABEL[m.role]} · ••{m.phone_last4}
+                </span>
+              </span>
+              {m.verified ? <VerifiedBadge /> : <Badge tone="amber">Not signed in yet</Badge>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && (
+        <form onSubmit={submit} className="space-y-3 rounded-2xl bg-slate-50 p-4">
+          <Field id="mate-name" label="Name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
+          <Field
+            id="mate-phone"
+            label="Mobile number (+91)"
+            type="tel"
+            inputMode="numeric"
+            placeholder="98765 43210"
+            value={formatPhone(phone)}
+            onChange={(e) => setPhone(digitsOnlyPhone(e.target.value))}
+            required
+          />
+          <label className="block space-y-1.5 text-sm font-medium text-ink">
+            Role
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'finance' | 'member')}
+              className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base"
+            >
+              <option value="finance">Finance (can approve payments)</option>
+              <option value="member">Team member (can raise payments)</option>
+            </select>
+          </label>
+          <div className="flex gap-2">
+            <Button type="submit" busy={busy} className="flex-1" disabled={!/^[6-9]\d{9}$/.test(phone) || !name.trim()}>
+              Add teammate
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      {added && <p className="px-2 text-sm text-emerald-700">{added}</p>}
+      <ErrorText>{error}</ErrorText>
+    </section>
   )
 }
 
@@ -264,6 +372,7 @@ export default function Home() {
           </div>
           {isTeam && <NewRoom orgId={org.org_id} onCreated={(r) => navigate(`/rooms/${r.id}`)} />}
           {isTeam && <AskBox orgId={org.org_id} />}
+          {org.role === 'owner' && <TeamSection orgId={org.org_id} />}
           <ErrorText>{error}</ErrorText>
           <section>
             <h2 className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Deal Rooms</h2>

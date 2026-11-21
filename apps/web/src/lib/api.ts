@@ -35,6 +35,14 @@ export interface Room {
   members: RoomMember[]
 }
 
+export interface TeamMember {
+  user_id: string
+  name: string
+  role: Role
+  phone_last4: string
+  verified: boolean
+}
+
 export interface OtpRequested {
   phone: string
   is_new_user: boolean
@@ -185,6 +193,9 @@ export const Api = {
   me: () => api<User>('/api/me'),
   createOrg: (name: string) => api<{ id: string; name: string; role: Role }>('/api/orgs', post({ name })),
   rooms: (orgId: string) => api<Room[]>(`/api/orgs/${orgId}/rooms`),
+  members: (orgId: string) => api<TeamMember[]>(`/api/orgs/${orgId}/members`),
+  addTeammate: (orgId: string, body: { phone: string; name: string; role: 'finance' | 'member' }) =>
+    api<TeamMember>(`/api/orgs/${orgId}/members`, post(body)),
   createRoom: (orgId: string, type: RoomType, title: string) =>
     api<Room>(`/api/orgs/${orgId}/rooms`, post({ type, title })),
   room: (roomId: string) => api<Room>(`/api/rooms/${roomId}`),

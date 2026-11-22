@@ -20,6 +20,7 @@ risk-checked card that a chat message can never execute.
 Everyday chat stays on WhatsApp or Slack. Pakkaa is where money is decided.
 
 **Live:** https://pakkaa-atozz.vercel.app (demo mode: login codes are shown on screen, payments are simulated).
+**Write-up:** [docs/writeup/Pakkaa-writeup.pdf](docs/writeup/Pakkaa-writeup.pdf).
 Built on [Nexconn](https://www.nexconn.ai) Chat for the Nexconn Build Challenge 2026, starting at the Paytm
 Buildathon (Beyond 9to5, Bengaluru, 21 Nov 2026, Track 3). Nothing here is legal or financial advice.
 

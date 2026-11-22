@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pakkaa write-up · Nexconn Build Challenge 2026</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 14mm 14mm; }
+  :root { --brand: #047857; --ink: #0f172a; --muted: #475569; --line: #e2e8f0; --soft: #ecfdf5; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; color: var(--ink);
+         font-size: 9.6pt; line-height: 1.42; margin: 0; }
+  h1 { font-size: 22pt; margin: 0; letter-spacing: -0.3px; }
+  h1 .tag { color: var(--brand); }
+  h2 { font-size: 12.5pt; color: var(--brand); margin: 13px 0 5px; padding-bottom: 3px; border-bottom: 1.5px solid var(--soft); }
+  h3 { font-size: 10pt; margin: 8px 0 3px; }
+  p { margin: 4px 0; }
+  ul { margin: 3px 0 4px; padding-left: 16px; }
+  li { margin: 1.5px 0; }
+  a { color: var(--brand); text-decoration: none; }
+  .pitch { font-size: 11.5pt; color: var(--muted); margin: 4px 0 8px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; background: var(--soft);
+          border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 12px; font-size: 9.2pt; }
+  .meta b { color: var(--brand); }
+  .key { font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 10pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.8pt; margin: 4px 0 6px; }
+  th, td { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 8.4pt; background: #f1f5f9; padding: 0 3px; border-radius: 3px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0; }
+  .stat div { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .stat b { display: block; font-size: 13pt; color: var(--brand); }
+  .stat span { font-size: 8.2pt; color: var(--muted); }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+  figcaption { font-size: 8pt; color: var(--muted); margin-top: 2px; }
+  .callout { border-left: 3px solid var(--brand); background: #f8fafc; padding: 5px 9px; margin: 6px 0; }
+  .small { font-size: 8.2pt; color: var(--muted); }
+  .break { break-before: page; }
+  .avoid { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>Pakkaa <span class="tag">· Deal pakkaa! Payment pakkaa!</span></h1>
+<p class="pitch">The money layer for business conversations. Pakkaa turns what people agree in chat into a signed
+term sheet, and turns every payment request into a verified, risk-checked card that a chat message can never execute.
+<i>Pakkaa (Hindi): settled, certain.</i></p>
+
+<div class="meta">
+  <div><b>Live app:</b> <a href="https://pakkaa-atozz.vercel.app">https://pakkaa-atozz.vercel.app</a></div>
+  <div><b>Source:</b> <a href="https://github.com/Chiru595/pakkaa">https://github.com/Chiru595/pakkaa</a></div>
+  <div><b>Nexconn App Key:</b> <span class="key">Y745wfm8ynayv</span> (data center SG)</div>
+  <div><b>Track:</b> Open Innovation (buyer-seller and team chat)</div>
+  <div><b>Nexconn packages:</b> Chat SDK, <code>@nexconn/engine</code> + <code>@nexconn/chat</code> 26.2.0</div>
+  <div><b>Platform:</b> Web (mobile-first), React + FastAPI on Vercel</div>
+</div>
+
+<h2>Why we built it</h2>
+<p>Small businesses everywhere agree deals in chat, and payment instructions arrive in chat. But nothing in that chat
+protects the money. Contracts come before the conversation and invoices and payouts come after it, so the moment the
+money is decided goes unprotected.</p>
+<div class="stat">
+  <div><b>₹10.4 crore</b><span>lost by one Mumbai company in 63 transfers (June 2026) to a "director" on WhatsApp
+    who asked for urgency and secrecy (Business Today)</span></div>
+  <div><b>$3.05 billion</b><span>lost to business email compromise in 2025; the FBI's definition now includes phone
+    numbers and messaging (FBI IC3 2025)</span></div>
+  <div><b>85%</b><span>of freelancers are paid late at least some of the time (Remote, 2025). In India, ₹33,005 crore is
+    stuck in MSME delayed-payment cases (MSME Samadhaan)</span></div>
+</div>
+<p>Razorpay's <i>Fix My Itch</i> ranks "Why can't SMEs negotiate favorable payment terms with large buyers?" as the top
+B2B services problem (itch score 82.8), and "freelancers ghosted after partial payment" at 76. Pakkaa answers both, and
+the fake-boss payment fraud too, inside the conversation where they happen.</p>
+
+<h2>What it does</h2>
+<div class="two">
+  <div>
+    <h3>Deal Room · money in</h3>
+    <ul>
+      <li><b>Private negotiation copilot</b> for the freelancer: three streamed reply options, each with a tactic and a
+        one-line reason, built on her private walk-away price and past deals. The client never sees it.</li>
+      <li><b>Pre-send check</b> warns before replying below the walk-away price or sharing an OTP in chat. It never blocks.</li>
+      <li><b>Scribe</b> turns chat into terms (price, advance, timeline, revisions), quoting the message each came from;
+        a person confirms each one.</li>
+      <li><b>OTP signing</b>: both sides sign the exact version; SHA-256 lock; any change needs both again.</li>
+      <li><b>Memory</b>: "Ravi paid the last advance 15 days late" appears privately when a known client joins; a
+        fair-price meter compares the offer with your own past deals.</li>
+      <li>Verified advance payment link (simulated in this build).</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Pay Lane · money out</h3>
+    <ul>
+      <li><b>Chat can never move money.</b> A payment instruction typed in chat becomes an unverified draft that can
+        never be approved or paid. A lookalike using the owner's name is flagged.</li>
+      <li><b>Risk rules in code</b>, each with evidence: unverified requester, name clash, new payee, bank change,
+        above-usual amount, urgency or secrecy words, off-hours, split payments, deal mismatch.</li>
+      <li><b>Step-up OTP</b> for risky cards: the requester re-confirms the exact amount and account.</li>
+      <li><b>Approvals by amount band</b>, no self-approval, edits reset approvals, a 3-line approver brief from code facts.</li>
+      <li><b>Two-key kill switch</b> and a <b>hash-chained audit log</b> that verifies without the database.</li>
+      <li><b>Learning only tightens</b>: late payers, outcomes and fraud reports make the next check stricter.</li>
+    </ul>
+  </div>
+</div>
+<div class="callout"><b>AI advises, code decides.</b> No model output can sign, approve, pay, freeze or change a role.
+Chat text reaches models only as untrusted data, and every structured output is validated.</div>
+
+<div class="shots avoid">
+  <figure><img src="../screenshots/04-freelancer-copilot.png" alt="Private copilot on phone A, client view on phone B">
+    <figcaption>Asha's private copilot suggests replies; Ravi sees the same chat, never the copilot.</figcaption></figure>
+  <figure><img src="../screenshots/10-impostor-blocked.png" alt="Impostor request becomes an unverified draft at risk 100">
+    <figcaption>An impostor named "Asha Rao" asks for money in chat: unverified draft, risk 100.</figcaption></figure>
+</div>
+
+<h2>Features that use the Nexconn SDK</h2>
+<p>Nexconn is the real-time layer of every room. Without it there is no Deal Room and no Pay Lane.</p>
+<table>
+  <tr><th style="width:44%">Nexconn feature</th><th>Where Pakkaa uses it</th></tr>
+  <tr><td>Web Chat SDK <code>@nexconn/engine</code>, <code>@nexconn/chat</code> 26.2.0: <code>NCEngine.initialize</code>,
+    <code>connect</code>, message and connection-status handlers</td>
+    <td>Every signed-in browser connects with a per-user token; messages, cards and the live dot arrive in real time</td></tr>
+  <tr><td>Server API user tokens (<code>/v4/auth/access-token/issue</code>, <code>/expire</code>)</td>
+    <td>Issued on each login by our API; the App Secret never reaches the browser</td></tr>
+  <tr><td>Group channels (<code>/v4/group-channel/create</code>, <code>/join</code>)</td>
+    <td>One channel per Deal Room and per Pay Lane; members join when they accept a signed, single-use invite</td></tr>
+  <tr><td>Group messages through the server API as the user (<code>fromUserId</code>, <code>isEchoToSender</code>)</td>
+    <td>Every chat message: membership checked, stored, read by the Scribe and the money-talk detector, then delivered live</td></tr>
+  <tr><td>Custom message type <code>PK:Card</code> registered with <code>registerCustomMessages</code></td>
+    <td>Term sheet, payment-status and payment cards posted by the Pakkaa bot user</td></tr>
+  <tr><td>Directed messages (<code>toUserIds</code>)</td>
+    <td>Private notices only one side may see, such as the late-payer heads-up</td></tr>
+  <tr><td>Webhooks (<code>message:send</code>, signature checked)</td>
+    <td>Receiver built and tested, so the bot can also react to messages sent from elsewhere</td></tr>
+</table>
+<p class="small">Why messages go through our API: group history from the SDK did not return text messages sent with
+<code>channel.sendMessage</code> from the web (tested with two browsers), and money decisions need one trusted, stored
+stream. So the browser receives everything live through the Chat SDK, while sends go through Nexconn's server API after
+our checks. Details are in <code>NEXCONN_NOTES.md</code>.</p>
+
+<h2>Architecture</h2>
+<table>
+  <tr><th style="width:22%">Part</th><th>What it is</th></tr>
+  <tr><td>Web app</td><td>React 19, TypeScript, Vite, Tailwind; mobile-first, one screen per phone; Nexconn Web Chat SDK</td></tr>
+  <tr><td>API</td><td>FastAPI, SQLAlchemy, Alembic on Vercel (Singapore, next to Nexconn SG); every money action is plain
+    Python with role checks, state checks, idempotency keys and an audit entry</td></tr>
+  <tr><td>Data</td><td>Postgres 16 + pgvector on Neon: source of truth, memory vectors, one audit chain per workspace</td></tr>
+  <tr><td>AI</td><td>OpenAI, one model per lane (fast checks, live copilot, extraction, deep); streamed over SSE; circuit
+    breaker so money flows never depend on a model</td></tr>
+</table>
+
+<h2>Security and reliability</h2>
+<ul>
+  <li><b>113 automated API tests</b> against a real Postgres with every model call mocked, including red-team cases:
+    impostor payouts, "approve card" commands in chat, self-approval, approvals reset on edit, bank change with urgency,
+    copilot only for the freelancer, double payouts, audit tampering, cross-org access, payouts while frozen.</li>
+  <li>Phone OTP hashed with a pepper (5-minute expiry, attempt lockout); 15-minute access tokens with rotating refresh
+    cookies and reuse detection; rate limits on every state change; other workspaces get 404.</li>
+  <li>Bank and UPI details encrypted with AES-256-GCM (versioned keys) and masked to the last 4 digits everywhere.</li>
+  <li>Append-only, hash-chained audit log with JSONL/CSV export and a standalone verifier script.</li>
+</ul>
+
+<div class="avoid"><h2>How to try it (about 3 minutes)</h2>
+<p>Open <a href="https://pakkaa-atozz.vercel.app">pakkaa-atozz.vercel.app</a> in a normal and an incognito window (or
+two phones) and tap <b>Demo guide</b> for the script. Login codes appear on screen in demo mode; no SMS is sent and all
+payments are simulated. If the demo looks used, <b>Demo guide → Rebuild demo workspace</b> restores it in a few seconds
+(it also rebuilds every night).</p>
+<table>
+  <tr><th>Number</th><th>Person</th><th>Role in the demo</th></tr>
+  <tr><td>98765 01001</td><td>Asha Rao</td><td>Owner and freelancer (phone A)</td></tr>
+  <tr><td>98765 01005</td><td>Ravi Kumar</td><td>Client from Ravi Foods (phone B)</td></tr>
+  <tr><td>98765 01002 / 01003</td><td>Farah Khan / Dev Menon</td><td>Finance, first and second approver</td></tr>
+  <tr><td>98765 01009</td><td>"Asha Rao"</td><td>Impostor vendor using the owner's name</td></tr>
+</table></div>
+
+<div class="shots avoid">
+  <figure><img src="../screenshots/08-otp-sign-and-lock.png" alt="Both sides sign the term sheet with OTP">
+    <figcaption>Both sides sign the exact version with an OTP; the sheet locks with its SHA-256.</figcaption></figure>
+  <figure><img src="../screenshots/12-approver-brief.png" alt="Approver brief and step-up result" style="max-height:330px; width:auto; display:block; margin:0 auto;">
+    <figcaption>Approver brief from code facts, the risk rule that fired, and the step-up result.</figcaption></figure>
+</div>
+
+<h2>Business and growth potential</h2>
+<div class="two">
+  <div>
+    <h3>Who it is for and who pays</h3>
+    <ul>
+      <li>Freelancers, agencies and small teams (2 to 50 people) that sell and pay over chat: India first, then anywhere
+        chat is where business happens.</li>
+      <li>Freemium per workspace: Deal Rooms free for solo freelancers; a team plan for Pay Lane approvals, audit
+        export and more seats.</li>
+      <li>Transaction revenue once real rails are wired: payment-link fees on advances and payout fees through partners
+        such as Paytm Payouts.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Why it grows</h3>
+    <ul>
+      <li>Every deal invites a client and every Pay Lane invites vendors, so each room brings new users into the
+        Nexconn app on its own.</li>
+      <li>Memory compounds: the more deals and payouts a team runs, the sharper its copilot and risk checks become.</li>
+      <li>Next: change-order cards, milestones and invoices, WhatsApp/Slack chat import, dispute packs; then Paytm
+        payment rails, DLT-registered SMS OTP and an external security review before real money moves.</li>
+    </ul>
+  </div>
+</div>
+
+<h2>What existed before, and what was built for this challenge</h2>
+<p>All of Pakkaa's code is new, built from 21 Nov 2026 inside the challenge window: the web app, the API, the Nexconn
+integration and every feature above. The idea is inspired by the author's earlier project
+<a href="https://github.com/Chiru595/paidsafe">PaidSafe</a> (a team chat room where AI agents helped a small supplier
+decide whether to chase a late invoice, with code-enforced approvals and a kill switch). Pakkaa is a new product on a
+different platform (Nexconn), with a new web app and API and new features for negotiating deals and approving
+payments. The public commit history records what was built and when.</p>
+
+<p class="small">Nothing in Pakkaa is legal or financial advice. Payments in this build are simulated and labelled
+"Simulated". Sources: Business Today (18 Jun 2026); FBI IC3 2025 Internet Crime Report; Remote Contractor Management
+Report 2025; Ministry of MSME, MSME Samadhaan (accessed 21 Nov 2026); Razorpay Fix My Itch (accessed 21 Nov 2026).
+Full source list in the README.</p>
+
+</body>
+</html>

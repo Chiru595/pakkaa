@@ -58,9 +58,10 @@ def main() -> None:
     os.environ.update(env)
     os.environ["DATABASE_URL"] = url
     sys.path.insert(0, str(ROOT / "services" / "api"))
+    from sqlalchemy import create_engine, text
+
     from app import models  # noqa: F401
     from app.db import Base
-    from sqlalchemy import create_engine, text
 
     tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
     engine = create_engine(url)

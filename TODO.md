@@ -15,7 +15,7 @@ milestone must meet these rules:
    API. The browser never decides anything that matters.
 3. **Every state change is authorised, idempotent and audited.** Role and org checked in the API, idempotency
    key on every money request, hash-chained audit entry on every change.
-4. **Money flows never depend on an LLM.** If Anthropic is down or slow, the copilot degrades and money flows
+4. **Money flows never depend on an LLM.** If OpenAI is down or slow, the copilot degrades and money flows
    keep working.
 5. **Payments are simulated and labelled.** No payment provider is used. A `PaymentProvider` interface with one
    `SimulatedProvider` keeps the flow real end to end, and every payment shows a "Simulated" badge.
@@ -127,6 +127,7 @@ milestone must meet these rules:
 - [ ] Privacy policy, terms and grievance contact pages (DPDP) (P)
 - [x] README: setup, architecture, screenshots, demo accounts, "not legal or financial advice"
 - [x] Run the demo script end to end twice without errors
+- [x] Rebuild demo workspace from the demo guide (demo mode only, Acme Studio only) and a nightly Vercel cron
 
 ## Next features
 

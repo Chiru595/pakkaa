@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     migrate_on_start: bool = False
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = False
+    cron_secret: str = ""
 
     jwt_secret: str = ""
     guest_link_secret: str = ""

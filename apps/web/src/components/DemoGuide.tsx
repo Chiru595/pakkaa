@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
-import { ROLE_LABEL, type Role } from '../lib/api'
+import { api, ApiError, ROLE_LABEL, type Role } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { useDemoGuide } from '../lib/demo'
 import { formatPhone } from '../lib/phone'
 import { Button } from './ui'
@@ -22,6 +23,11 @@ export default function DemoGuide() {
   const [open, setOpen] = useState(false)
   const [done, setDone] = useState<Record<string, boolean>>(readDone)
   const [copied, setCopied] = useState<string | null>(null)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     try {
@@ -32,6 +38,23 @@ export default function DemoGuide() {
   }, [done])
 
   if (!guide || (pathname.startsWith('/rooms/') && !open)) return null
+
+  async function resetDemo() {
+    setResetting(true)
+    setResetError(null)
+    try {
+      await api('/api/demo/reset', { method: 'POST' }, false)
+      setDone({})
+      setConfirmReset(false)
+      setOpen(false)
+      if (user) await signOut()
+      navigate('/', { replace: true })
+    } catch (e) {
+      setResetError(e instanceof ApiError ? e.message : 'Could not rebuild the demo. Try again in a minute.')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   async function copy(phone: string) {
     try {
@@ -116,6 +139,32 @@ export default function DemoGuide() {
               <Button variant="secondary" className="w-full" onClick={() => setDone({})}>
                 Reset checklist
               </Button>
+              <section className="rounded-2xl border border-slate-200 p-3">
+                <h3 className="text-sm font-semibold text-ink">Demo looks used?</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Rebuild {guide.org_name} with fresh data: the past deal, payees and payment history come back, and payouts
+                  are unfrozen. Your own workspaces are not touched. It also rebuilds every night.
+                </p>
+                {confirmReset ? (
+                  <div className="mt-2 flex gap-2">
+                    <Button variant="secondary" className="flex-1" onClick={() => setConfirmReset(false)} disabled={resetting}>
+                      Cancel
+                    </Button>
+                    <Button className="flex-1" busy={resetting} onClick={() => void resetDemo()}>
+                      Rebuild now
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="secondary" className="mt-2 w-full" onClick={() => setConfirmReset(true)}>
+                    Rebuild demo workspace
+                  </Button>
+                )}
+                {resetError && (
+                  <p className="mt-2 text-xs text-red-600" role="alert">
+                    {resetError}
+                  </p>
+                )}
+              </section>
             </div>
           </div>
         </div>

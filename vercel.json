@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
+  "crons": [{ "path": "/api/demo/cron-reset", "schedule": "30 21 * * *" }],
   "services": {
     "web": {
       "root": "apps/web",

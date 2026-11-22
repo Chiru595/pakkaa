@@ -54,7 +54,7 @@
 | Audit log | Append-only, one SHA-256 hash chain per workspace; verify and export (JSONL or CSV); a standalone script verifies an export without the database | Postgres advisory locks, SHA-256, streaming export |
 | Web app | Mobile-first, one screen per phone | React 19, TypeScript, Vite, Tailwind CSS 4, React Router |
 | Hosting | Static web plus Python API in one deployment, Singapore region; migrations run on startup under a lock | Vercel Services, Neon Postgres, Alembic |
-| Tests | 112 API tests against a real Postgres with every model call mocked, including the red-team cases | pytest, respx, ruff, TypeScript compiler |
+| Tests | 113 API tests against a real Postgres with every model call mocked, including the red-team cases | pytest, respx, ruff, TypeScript compiler |
 
 ## How the AI works
 

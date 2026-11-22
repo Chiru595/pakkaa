@@ -20,8 +20,8 @@ risk-checked card that a chat message can never execute.
 Everyday chat stays on WhatsApp or Slack. Pakkaa is where money is decided.
 
 **Live:** https://pakkaa-atozz.vercel.app (demo mode: login codes are shown on screen, payments are simulated).
-Built at the Paytm Buildathon (Beyond 9to5, Bengaluru, 21 Nov 2026), Track 3, on [Nexconn](https://www.nexconn.ai)
-Chat. Nothing here is legal or financial advice.
+Built on [Nexconn](https://www.nexconn.ai) Chat for the Nexconn Build Challenge 2026, starting at the Paytm
+Buildathon (Beyond 9to5, Bengaluru, 21 Nov 2026, Track 3). Nothing here is legal or financial advice.
 
 ## The problem
 
@@ -205,6 +205,24 @@ vercel.json     Vercel Services: web (Vite) and api (FastAPI, Singapore region)
 - Models: `gpt-6-luna` for fast checks, `gpt-6.1-terra` for live copilot replies, `gpt-6.2-sol` for extraction,
   briefs and explanations, `gpt-6.2-astra` for slow high-stakes work, `text-embedding-3-small` for memory.
 
+## How Pakkaa uses Nexconn
+
+Nexconn is the real-time layer of every room. Without it there is no Deal Room and no Pay Lane.
+
+| Nexconn feature | Where Pakkaa uses it |
+|---|---|
+| Web Chat SDK (`@nexconn/engine`, `@nexconn/chat` 26.2.0): `NCEngine.initialize`, `connect`, message and connection-status handlers | Every signed-in browser connects with a per-user token; messages, cards and the online dot arrive live |
+| Server API user tokens (`/v4/auth/access-token/issue`, `/expire`) | Issued on each login by our API; the App Secret never reaches the browser |
+| Group channels (`/v4/group-channel/create`, `/join`) | One channel per Deal Room and per Pay Lane; members join when they accept a signed invite |
+| Group messages sent through the server API as the user (`fromUserId`, `isEchoToSender`) | Every chat message: checked for membership, stored, read by the Scribe and the money-talk detector, then delivered live |
+| Custom message type `PK:Card`, registered with `registerCustomMessages` | Term sheet, payment-status and payment cards posted by the Pakkaa bot user |
+| Directed messages (`toUserIds`) | Private notices only one side may see, such as the late-payer heads-up |
+| Webhooks (`message:send`, signature checked) | Receiver built and tested, so the bot can also react to messages sent from elsewhere |
+
+Why messages go through our API: group history from the SDK did not return text messages sent with
+`channel.sendMessage` from the web (tested with two browsers), and money decisions need one trusted, stored stream.
+Details and fallbacks are in [NEXCONN_NOTES.md](NEXCONN_NOTES.md).
+
 See [docs/TECHNICAL.md](docs/TECHNICAL.md) for the tech stack per feature and how each part works,
 [NEXCONN_NOTES.md](NEXCONN_NOTES.md) for how Nexconn is used, and [TODO.md](TODO.md) for progress.
 
@@ -226,9 +244,12 @@ one-time code appears on screen.
    advance 15 days late. Asha's copilot suggests replies; the pre-send check warns below her walk-away;
    the Scribe fills the term sheet; both sign with OTP; Ravi pays the advance (simulated).
 2. **Pay Lane:** the impostor's "urgent, confidential" transfer becomes an unverified draft at risk 100. Asha's
-   card for Kabir is high risk (bank details changed), so Asha confirms it with an OTP; Farah reads the approver
-   brief and approves, Dev approves, payout (simulated).
+   card for Kabir needs a step-up check because Kabir's bank details changed two days ago, so Asha confirms the
+   exact card with an OTP; Farah reads the approver brief and approves, Dev approves, payout (simulated).
 3. **Learning:** mark the deal won; Pay Lane → Learning shows what Pakkaa learned and the audit chain verifies.
+
+If the demo looks used (someone froze payouts or signed the deal already), open **Demo guide → Rebuild demo
+workspace**. It rebuilds only Acme Studio, and a Vercel cron rebuilds it every night at 03:00 IST.
 
 To seed your own database: `.\services\api\.venv\Scripts\python scripts\seed_demo.py` (add `--reset` to rebuild
 the demo workspace; seeding a non-local database requires `--allow-remote`). Set `DEMO_MODE=true` to show codes on
@@ -303,7 +324,7 @@ cd ..\..\apps\web
 npx tsc -b
 ```
 
-112 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
+113 API tests run against a real Postgres database (`pakkaa_test`, created by `scripts/dev_db.py` or Docker, or
 set `TEST_DATABASE_URL`), with every model request mocked. They include the red-team cases: impostor payouts, chat
 commands to approve, self-approval, approvals reset on edit, bank change with urgency (step-up OTP required),
 copilot only for the freelancer's side, double payouts, audit tampering, cross-org access, payouts while frozen, and learning
